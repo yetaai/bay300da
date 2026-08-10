@@ -2,7 +2,7 @@
 
 The print agent is a small headless Python program installed on a trusted store machine.
 It polls Bay300 for versioned Bill print jobs, verifies each SHA-256 checksum, creates a
-self-contained printable HTML file, submits it to the local print command, and retains a
+PDF plus its self-contained HTML source, submits the PDF to the local print command, and retains a
 local SQLite journal plus Printed/Failed folders.
 
 The Bay300 server retains the immutable serialized Bill and job metadata. It does not
@@ -60,7 +60,7 @@ Enable user lingering if the agent must run while nobody is logged in:
 sudo loginctl enable-linger "$USER"
 ```
 
-Files are under `~/.local/share/bay300-print-agent/{Pending,Printed,Failed}`. The local
+PDF and HTML files are under `~/.local/share/bay300-print-agent/{Pending,Printed,Failed}`. The local
 SQLite journal prevents a successfully spooled job from being printed twice after a
 normal restart. A power loss exactly between printer acceptance and acknowledgement is
 inherently ambiguous; inspect the physical output and request an audited reprint rather

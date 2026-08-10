@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .client import Bay300Client
-from .render import write_html
+from .render import write_html,write_pdf
 
 
 class PrintAgent:
@@ -34,6 +34,7 @@ class PrintAgent:
         if not job:
             return False
         job_id = job["jobId"]
+        pending_html=None;pending_pdf=None
         try:
             raw = job["documentJson"]
             actual = hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -48,15 +49,19 @@ class PrintAgent:
                 return True
             safe_number = "".join(c if c.isalnum() or c in "-_" else "-" for c in document["billNumber"])
             filename = f"{safe_number}-v{job['documentVersion']}-copy{job['copyNumber']}-{job_id}.html"
-            pending = write_html(document, job["copyNumber"], self.root / "Pending" / filename)
-            self._record(job_id, actual, "rendered", str(pending))
-            self._print(pending)
-            printed = self.root / "Printed" / filename
-            shutil.move(str(pending), printed)
-            self._record(job_id, actual, "spooled", str(printed))
-            self.client.spooled(job_id, str(printed))
+            pending_html = write_html(document, job["copyNumber"], self.root / "Pending" / filename)
+            pending_pdf = write_pdf(document,job["copyNumber"],pending_html.with_suffix(".pdf"))
+            self._record(job_id, actual, "rendered", str(pending_pdf))
+            self._print(pending_pdf)
+            printed_pdf = self.root / "Printed" / pending_pdf.name
+            printed_html = self.root / "Printed" / pending_html.name
+            shutil.move(str(pending_pdf), printed_pdf);shutil.move(str(pending_html),printed_html)
+            self._record(job_id, actual, "spooled", str(printed_pdf))
+            self.client.spooled(job_id, str(printed_pdf))
             return True
         except Exception as error:
+            for pending in (pending_pdf,pending_html):
+                if pending and pending.exists():shutil.move(str(pending),self.root/"Failed"/pending.name)
             self._record(job_id, job.get("documentSha256", "unknown"), "failed", str(error))
             try:
                 self.client.failed(job_id, str(error))

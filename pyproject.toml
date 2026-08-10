@@ -9,6 +9,7 @@ description = "Headless store-side Bill printing agent for Bay300"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
 authors = [{name = "Bay300"}]
+dependencies = ["reportlab>=4.2,<5"]
 
 [project.scripts]
 bay300-print-agent = "bay300_print_agent.cli:main"

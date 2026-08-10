@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bay300_print_agent.render import render_html, write_html
+from bay300_print_agent.render import render_html, write_html,write_pdf
 
 
 DOCUMENT = {
@@ -26,6 +26,11 @@ class RenderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = write_html(DOCUMENT, 1, Path(directory) / "nested" / "bill.html")
             self.assertTrue(path.exists())
+
+    def test_pdf_is_generated_for_reliable_cups_printing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=write_pdf(DOCUMENT,2,Path(directory)/"bill.pdf")
+            self.assertTrue(path.read_bytes().startswith(b"%PDF-"))
 
 
 if __name__ == "__main__":
