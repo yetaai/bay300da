@@ -9,7 +9,7 @@ drivers, paths, and other local configuration remain on the store machine.
 
 - Python 3.11 or newer;
 - an HTTPS connection to `https://bay300.com`;
-- Tk/Tkinter for the graphical program;
+- Tk/Tkinter only when using the Devices Admin window;
 - a locally installed printer driver/CUPS queue for current Bill printing.
 
 Store Owner/OP users should normally open **Device Monitor → Install Devices Admin**. Bay300
@@ -18,17 +18,32 @@ browser platform. Each bundle contains only this agent project and platform laun
 agent source is [yetaai/bay300da](https://github.com/yetaai/bay300da); it is separate from the
 private Bay300 application and contains no service credentials or user authorization tokens.
 
-On Linux or macOS, install the current public source in one line:
+Bay300 supports two operating styles. Choose based on how the store computer is used, not on anyone's
+technical experience:
+
+- **Devices Admin window** lets a person add, edit, check, block, and remove local devices. It uses
+  Tkinter, a standard Python window toolkit. You do not need to know Tkinter; the installer only
+  checks that the computer has it.
+- **Background-only service** has no window and needs no Tkinter. It is suitable after devices are
+  configured, or when authorization adds one initial Bill printer with `--printer`. It processes
+  queued work with `bay300da run`.
+
+On Linux or macOS, install for the Devices Admin window in one line:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | bash
 ```
 
-The installer checks Python and Tkinter, creates a private virtual environment, and places a
+For a background-only service, use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | env BAY300DA_HEADLESS=1 bash
+```
+
+The installer checks the requirements for the selected style, creates a private virtual environment, and places a
 `bay300da` launcher in `~/.local/bin`. It never creates an authorization token. Review the script
 before running it if required by store policy. Windows users should use the ZIP package from Device
-Monitor. A machine intentionally running only `bay300da run` may set `BAY300DA_HEADLESS=1` to skip
-the Tkinter check.
+Monitor.
 
 To install manually from the public repository instead:
 
@@ -64,7 +79,7 @@ browser/user session token. Unix permissions are forced to `0600`. On Windows, `
 inherited permissions and restricts the file ACL to the running Windows account. The token expires
 after 30 days; run `bay300da authorize` again after expiration.
 
-Open the graphical program:
+Open the Devices Admin window:
 
 ```bash
 bay300da
@@ -74,7 +89,7 @@ It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Ch
 and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds; Poll server now,
 local configuration changes, task activity, and connectivity recovery reset the cycle.
 
-Headless operation is also available:
+Run without a window when that better fits the store computer:
 
 ```bash
 bay300da doctor
