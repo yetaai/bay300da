@@ -2,9 +2,12 @@ import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from unittest.mock import patch
 
 from bay300_device_agent.agent import DeviceAgent
+from bay300_device_agent.cli import build_parser,manage_device
 from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
@@ -54,6 +57,38 @@ class DeviceAuthorizationTests(unittest.TestCase):
             failures=[];agent.client.failed=lambda job_id,message:failures.append((job_id,message))
             self.assertTrue(agent.run_once());self.assertEqual(device["id"],registry.list()[0]["id"])
             self.assertIn("Unsupported",failures[0][1])
+
+    def test_cli_device_management_matches_gui_registry_operations(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_WORK":f"{directory}/work","BAY300DA_DEVICES":f"{directory}/devices.json",
+        }),patch("bay300_device_agent.cli.DeviceAgent.sync") as sync:
+            parser=build_parser();authorization={"server":"https://bay300.test","token":"secret"}
+            output=StringIO()
+            with redirect_stdout(output):
+                manage_device(parser.parse_args(["device","add","--name","Front","--type","bill_printer",
+                    "--configuration","Front-CUPS"]),authorization)
+            registry=DeviceRegistry();device_id=registry.list()[0]["id"]
+            manage_device(parser.parse_args(["device","edit",device_id,"--name","Reception"]),authorization)
+            manage_device(parser.parse_args(["device","block",device_id]),authorization)
+            self.assertEqual("blocked",registry.list()[0]["status"])
+            manage_device(parser.parse_args(["device","unblock",device_id]),authorization)
+            manage_device(parser.parse_args(["device","edit",device_id,"--type","other"]),authorization)
+            manage_device(parser.parse_args(["device","check",device_id]),authorization)
+            listing=StringIO()
+            with redirect_stdout(listing):
+                manage_device(parser.parse_args(["device","list","--json"]),authorization)
+            self.assertEqual("Reception",json.loads(listing.getvalue())[0]["name"])
+            manage_device(parser.parse_args(["device","remove",device_id,"--yes"]),authorization)
+            self.assertEqual([],registry.list());self.assertEqual(7,sync.call_count)
+
+    def test_registry_rejects_invalid_cli_and_gui_values(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            registry=DeviceRegistry()
+            with self.assertRaises(ValueError):registry.add("","bill_printer")
+            with self.assertRaises(ValueError):registry.add("Front","unsupported")
+            with self.assertRaises(KeyError):registry.remove("missing")
 
 
 if __name__=="__main__":unittest.main()

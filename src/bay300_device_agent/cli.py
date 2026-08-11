@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import platform
 import socket
 import time
@@ -8,7 +9,7 @@ import time
 from .agent import DeviceAgent
 from .client import Bay300Client
 from .config import authorization_path,load_authorization,save_authorization
-from .devices import DeviceRegistry
+from .devices import CAPABILITIES,DeviceRegistry
 
 
 def authorize(args) -> None:
@@ -36,28 +37,93 @@ def authorize(args) -> None:
     print(f"Authorized {response['storeName']} Devices Admin. Authorization: {target}")
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser=argparse.ArgumentParser(prog="bay300da",description="Bay300 cross-platform store Devices Admin")
     sub=parser.add_subparsers(dest="command")
     auth=sub.add_parser("authorize",help="Authorize this Devices Admin for one store")
     auth.add_argument("--url",default="https://bay300.com");auth.add_argument("--contact")
     auth.add_argument("--name");auth.add_argument("--printer",help="Add an initial Bill printer")
+    sub.add_parser("gui",help="Open the Devices Admin GUI app")
     sub.add_parser("run",help="Run continuous command-line polling")
     sub.add_parser("once",help="Synchronize devices and handle at most one task")
+    sub.add_parser("poll",help="Synchronize devices and handle at most one task now")
     sub.add_parser("doctor",help="Check authorization and local device status")
-    args=parser.parse_args()
+    device=sub.add_parser("device",help="Manage local devices without the GUI app")
+    actions=device.add_subparsers(dest="device_command",required=True)
+    listing=actions.add_parser("list",help="List configured local devices")
+    listing.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+    add=actions.add_parser("add",help="Add a local device")
+    add.add_argument("--name",required=True);add.add_argument("--type",required=True,choices=tuple(CAPABILITIES))
+    add.add_argument("--configuration",default="",help="Printer name, scanner identifier, or local configuration")
+    add.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+    edit=actions.add_parser("edit",help="Edit a local device")
+    edit.add_argument("device_id");edit.add_argument("--name");edit.add_argument("--type",choices=tuple(CAPABILITIES))
+    edit.add_argument("--configuration");edit.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+    remove=actions.add_parser("remove",help="Remove a local device while retaining server task history")
+    remove.add_argument("device_id");remove.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
+    for action_name in ("block","unblock","check"):
+        action=actions.add_parser(action_name,help=f"{action_name.capitalize()} a local device")
+        action.add_argument("device_id");action.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+    return parser
+
+
+def _print_device(row: dict,json_output: bool=False) -> None:
+    if json_output:print(json.dumps(row,sort_keys=True));return
+    detail=row.get("statusMessage","")
+    print(f"{row['id']}  {row['name']}  {row['type']}  {row['status']}  {row.get('configuration','')}  {detail}")
+
+
+def manage_device(args,authorization: dict) -> None:
+    registry=DeviceRegistry()
+    if args.device_command=="list":
+        rows=registry.list()
+        if args.json:print(json.dumps(rows,sort_keys=True))
+        elif not rows:print("No local devices configured.")
+        else:
+            print("ID  NAME  TYPE  STATUS  CONFIGURATION  STATUS DETAIL")
+            for row in rows:_print_device(row)
+        return
+    try:
+        if args.device_command=="add":
+            row=registry.add(args.name,args.type,args.configuration)
+        elif args.device_command=="edit":
+            changes={key:value for key,value in {
+                "name":args.name,"type":args.type,"configuration":args.configuration,
+            }.items() if value is not None}
+            if not changes:raise SystemExit("Specify --name, --type, or --configuration to edit.")
+            row=registry.update(args.device_id,**changes)
+        elif args.device_command=="remove":
+            if not args.yes and input(f"Remove local device {args.device_id}? [y/N] ").strip().lower() not in {"y","yes"}:
+                print("Device removal cancelled.");return
+            registry.remove(args.device_id);row=None
+        elif args.device_command=="block":row=registry.block(args.device_id,True)
+        elif args.device_command=="unblock":row=registry.block(args.device_id,False)
+        else:row=registry.check(args.device_id)
+    except (KeyError,ValueError) as error:
+        message=error.args[0] if error.args else str(error)
+        raise SystemExit(f"Device change failed: {message}") from error
+    try:DeviceAgent(authorization,registry).sync()
+    except Exception as error:
+        raise SystemExit(f"Local device change was saved, but server synchronization failed: {error}") from error
+    if row is None:print(f"Removed {args.device_id}; server task history is retained.")
+    else:_print_device(row,args.json)
+
+
+def main(argv=None) -> None:
+    parser=build_parser();args=parser.parse_args(argv)
     if args.command=="authorize":authorize(args);return
     try:authorization=load_authorization()
     except RuntimeError as error:raise SystemExit(str(error)) from error
-    if args.command is None:
+    if args.command in {None,"gui"}:
         try:
             from .gui import run_gui
             run_gui(authorization)
         except ImportError as error:raise SystemExit("Tkinter is required for the graphical Devices Admin") from error
         return
+    if args.command=="device":manage_device(args,authorization);return
     agent=DeviceAgent(authorization)
     if args.command=="run":agent.run_forever()
-    elif args.command=="once":print("Handled one task." if agent.run_once() else "No compatible queued task.")
+    elif args.command in {"once","poll"}:print("Handled one task." if agent.run_once() else "No compatible queued task.")
     else:
         print(f"Python: {platform.python_version()}")
         print(f"Authorization: {authorization_path()}")
@@ -67,6 +133,7 @@ def main() -> None:
         print(f"Local devices: {len(rows)}")
         for row in rows:
             checked=registry.check(row["id"]);print(f"- {checked['name']}: {checked['status']} · {checked.get('statusMessage','')}")
+        agent.sync()
 
 
 if __name__=="__main__":main()

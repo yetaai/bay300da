@@ -26,14 +26,22 @@ class DeviceRegistry:
 
     def add(self,name: str,device_type: str,configuration: str="") -> dict:
         with self.lock:
+            clean_name=name.strip()
+            if not clean_name:raise ValueError("Device name is required")
+            if device_type not in CAPABILITIES:raise ValueError(f"Unsupported device type: {device_type}")
             devices=self.list()
-            row={"id":uuid.uuid4().hex,"name":name.strip(),"type":device_type,
+            row={"id":uuid.uuid4().hex,"name":clean_name,"type":device_type,
                  "capabilities":CAPABILITIES[device_type],"status":"ready",
                  "configuration":configuration.strip(),"statusMessage":"Not checked yet"}
             devices.append(row);self.save(devices);return row
 
     def update(self,device_id: str,**changes) -> dict:
         with self.lock:
+            if "name" in changes:
+                changes["name"]=changes["name"].strip()
+                if not changes["name"]:raise ValueError("Device name is required")
+            if "type" in changes and changes["type"] not in CAPABILITIES:
+                raise ValueError(f"Unsupported device type: {changes['type']}")
             devices=self.list();match=None
             for row in devices:
                 if row["id"]==device_id:
@@ -45,7 +53,8 @@ class DeviceRegistry:
 
     def remove(self,device_id: str) -> None:
         with self.lock:
-            devices=[row for row in self.list() if row["id"]!=device_id]
+            current=self.list();devices=[row for row in current if row["id"]!=device_id]
+            if len(devices)==len(current):raise KeyError(device_id)
             self.save(devices)
 
     def block(self,device_id: str,blocked: bool=True) -> dict:

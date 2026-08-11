@@ -24,9 +24,9 @@ technical experience:
 - **Install GUI app** lets a person add, edit, check, block, and remove local devices. It uses
   Tkinter, a standard Python window toolkit. You do not need to know Tkinter; the installer only
   checks that the computer has it.
-- **Install CLI app** installs command-line operation with no window and needs no Tkinter. It is suitable after devices are
-  configured, or when authorization adds one initial Bill printer with `--printer`. It processes
-  queued work with `bay300da run`. Installation does not automatically create a systemd service,
+- **Install CLI app** installs command-line operation with no window and needs no Tkinter. It can
+  authorize, add, list, edit, remove, block, unblock, and check devices, synchronize immediately,
+  and process queued work with `bay300da run`. Installation does not automatically create a systemd service,
   macOS LaunchAgent, or Windows service/Scheduled Task.
 
 On Linux or macOS, install the GUI app in one line:
@@ -93,10 +93,22 @@ local configuration changes, task activity, and connectivity recovery reset the 
 Use the CLI app when that better fits the store computer:
 
 ```bash
+bay300da device list
+bay300da device add --name "Front counter" --type bill_printer --configuration "Front-CUPS"
+bay300da device edit DEVICE_ID --name "Reception printer"
+bay300da device block DEVICE_ID
+bay300da device unblock DEVICE_ID
+bay300da device check DEVICE_ID
+bay300da device remove DEVICE_ID
+bay300da poll
 bay300da doctor
 bay300da once
 bay300da run
 ```
+
+Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
+prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.
+The GUI remains available explicitly as `bay300da gui` or, for compatibility, as `bay300da`.
 
 Linux users may install `packaging/bay300-device-agent.service` as a systemd user service.
 Windows production packaging should use a signed PyInstaller executable plus Scheduled Task or
