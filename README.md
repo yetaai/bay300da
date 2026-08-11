@@ -21,7 +21,7 @@ The package launchers are the simplest Grace installation. Repository-authorized
 instead install from the private agent-only source tag on Windows, macOS, or Linux:
 
 ```bash
-git clone --depth 1 --branch bay300da-grace git@github.com:yetaai/bay3000.git bay300da-grace
+git clone --depth 1 --branch bay300da-grace git@github.com:yetaai/bay300.git bay300da-grace
 cd bay300da-grace
 python -m venv .bay300da-venv
 ```
