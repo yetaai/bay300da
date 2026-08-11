@@ -79,3 +79,7 @@ the portable Grace-pilot distribution.
 Rendered Bill PDF/HTML and the idempotency journal remain under `~/.bay300/work`. Reprints are new
 audited server tasks. A processing cancellation is cooperative: the agent checks immediately before
 rendering and immediately before sending output to the local print subsystem.
+
+Bay300 assigns each task to the physical device selected by its requestor. `bay300da` polls once per
+ready local device, and a device can claim only tasks assigned to its synchronized identity. Renaming
+a local device preserves that identity; removing and recreating it creates a different destination.
