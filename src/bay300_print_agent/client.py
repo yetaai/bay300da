@@ -16,11 +16,11 @@ class Bay300Client:
         self.timeout = timeout
 
     def post(self, path: str, body: dict | None = None, agent_auth: bool = True) -> dict:
-        headers = {"Content-Type": "application/json", "User-Agent": "bay300-print-agent/0.1"}
+        headers = {"Content-Type": "application/json", "User-Agent": "bay300-device-agent/0.2"}
         if agent_auth:
             if not self.token:
-                raise ApiError("Print-agent token is not configured")
-            headers["X-Print-Agent-Token"] = self.token
+                raise ApiError("Device credential is not configured")
+            headers["X-Device-Credential"] = self.token
         request = urllib.request.Request(
             self.base_url + path,
             data=json.dumps(body or {}).encode("utf-8"),
@@ -36,17 +36,39 @@ class Bay300Client:
         except urllib.error.URLError as error:
             raise ApiError(f"Cannot reach Bay300: {error.reason}") from error
 
-    def enroll(self, code: str, device_name: str) -> dict:
-        return self.post("/api/print-agents/enroll", {
-            "enrollmentCode": code,
-            "deviceName": device_name,
+    def request_authorization(self, contact: str, agent_name: str) -> dict:
+        return self.post("/api/devices/authorization-requests", {
+            "contact": contact, "agentName": agent_name,
         }, agent_auth=False)
 
-    def claim(self) -> dict:
-        return self.post("/api/print-agents/jobs/claim").get("job") or {}
+    def poll_authorization(self, request_id: str, polling_token: str) -> dict:
+        original=self.token
+        try:
+            self.token=None
+            headers = {"Content-Type": "application/json", "User-Agent": "bay300-device-agent/0.2",
+                       "X-Device-Poll-Token": polling_token}
+            request = urllib.request.Request(
+                self.base_url + f"/api/devices/authorization-requests/{request_id}/poll",
+                data=b"{}", headers=headers, method="POST")
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            detail=error.read().decode("utf-8",errors="replace")
+            raise ApiError(f"Bay300 API returned HTTP {error.code}: {detail}") from error
+        finally:
+            self.token=original
+
+    def sync_devices(self,devices: list[dict]) -> dict:
+        return self.post("/api/device-agent/devices/sync",{"devices":devices})
+
+    def claim(self,device_id: str) -> dict:
+        return self.post("/api/devices/jobs/claim",{"deviceId":device_id}).get("job") or {}
+
+    def task_state(self,job_id: str) -> dict:
+        return self.post(f"/api/device-agent/jobs/{job_id}/state")
 
     def spooled(self, job_id: str, output_file: str) -> dict:
-        return self.post(f"/api/print-agents/jobs/{job_id}/spooled", {"outputFile": output_file})
+        return self.post(f"/api/devices/jobs/{job_id}/completed", {"outputFile": output_file})
 
     def failed(self, job_id: str, message: str) -> dict:
-        return self.post(f"/api/print-agents/jobs/{job_id}/failed", {"message": message})
+        return self.post(f"/api/devices/jobs/{job_id}/failed", {"message": message})

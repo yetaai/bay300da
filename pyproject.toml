@@ -3,15 +3,17 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bay300-print-agent"
-version = "0.1.0"
-description = "Headless store-side Bill printing agent for Bay300"
+name = "bay300-device-agent"
+version = "0.2.0"
+description = "Headless capability-scoped store device agent for Bay300"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
 authors = [{name = "Bay300"}]
 dependencies = ["reportlab>=4.2,<5"]
 
 [project.scripts]
+bay300da = "bay300_print_agent.cli:main"
+bay300-device-agent = "bay300_print_agent.cli:main"
 bay300-print-agent = "bay300_print_agent.cli:main"
 
 [tool.setuptools.packages.find]

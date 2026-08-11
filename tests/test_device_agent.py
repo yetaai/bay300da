@@ -1,0 +1,59 @@
+import json
+import os
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from bay300_print_agent.agent import DeviceAgent
+from bay300_print_agent.client import Bay300Client
+from bay300_print_agent.config import load_authorization,save_authorization
+from bay300_print_agent.devices import DeviceRegistry
+
+
+class FakeResponse:
+    def __init__(self,value):self.value=value
+    def __enter__(self):return self
+    def __exit__(self,*_):return False
+    def read(self):return json.dumps(self.value).encode()
+
+
+class DeviceAuthorizationTests(unittest.TestCase):
+    @patch("urllib.request.urlopen")
+    def test_request_and_poll_use_separate_unauthenticated_secrets(self,urlopen):
+        urlopen.side_effect=[FakeResponse({"authorizationRequestId":"r1","pollingToken":"poll"}),
+                             FakeResponse({"status":"pending_authorization"})]
+        client=Bay300Client("https://bay300.test")
+        pending=client.request_authorization("op@example.test","Store Devices Admin")
+        result=client.poll_authorization(pending["authorizationRequestId"],pending["pollingToken"])
+        self.assertEqual("pending_authorization",result["status"])
+        first=urlopen.call_args_list[0].args[0];second=urlopen.call_args_list[1].args[0]
+        self.assertNotIn("X-Device-Credential",first.headers)
+        self.assertEqual("poll",second.headers["X-device-poll-token"])
+
+    def test_authorization_is_mode_600_and_local_registry_owns_configuration(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_AUTHORIZATION":f"{directory}/authorization",
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            save_authorization({"server":"https://bay300.test","storeId":"s1","storeName":"Lovell","token":"secret"})
+            self.assertEqual("secret",load_authorization()["token"])
+            self.assertEqual(0,os.stat(f"{directory}/authorization").st_mode&0o077)
+            registry=DeviceRegistry();row=registry.add("Front","bill_printer","Front-CUPS")
+            self.assertEqual(["bill_print"],row["capabilities"])
+            self.assertEqual("Front-CUPS",registry.list()[0]["configuration"])
+            self.assertNotIn("configuration",registry.server_rows()[0])
+
+    def test_unknown_job_type_is_failed_without_execution(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_WORK":f"{directory}/work","BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            registry=DeviceRegistry();device=registry.add("Front","bill_printer","")
+            agent=DeviceAgent({"server":"https://bay300.test","token":"secret"},registry)
+            agent.client.sync_devices=lambda rows:None
+            agent.client.claim=lambda device_id:{"jobId":"job1","jobType":"scanner_upload"}
+            failures=[];agent.client.failed=lambda job_id,message:failures.append((job_id,message))
+            self.assertTrue(agent.run_once());self.assertEqual(device["id"],registry.list()[0]["id"])
+            self.assertIn("Unsupported",failures[0][1])
+
+
+if __name__=="__main__":unittest.main()

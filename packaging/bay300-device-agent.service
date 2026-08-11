@@ -1,18 +1,18 @@
 [Unit]
-Description=Bay300 store Bill print agent
+Description=Bay300 store device agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/share/bay300-print-agent/venv/bin/bay300-print-agent run
+ExecStart=%h/.local/share/bay300-device-agent/venv/bin/bay300da run
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.local/share/bay300-print-agent %h/.config/bay300-print-agent
+ReadWritePaths=%h/.local/share/bay300-device-agent %h/.bay300
 
 [Install]
 WantedBy=default.target

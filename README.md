@@ -1,67 +1,81 @@
-# Bay300 Print Agent
+# Bay300 Devices Admin (`bay300da`)
 
-The print agent is a small headless Python program installed on a trusted store machine.
-It polls Bay300 for versioned Bill print jobs, verifies each SHA-256 checksum, creates a
-PDF plus its self-contained HTML source, submits the PDF to the local print command, and retains a
-local SQLite journal plus Printed/Failed folders.
+`bay300da` is the store-machine program that owns physical printer/scanner configuration.
+After authorization its window title is **(Store Name) Devices Admin**. Bay300 receives only
+device identity, type, capabilities, status, and task outcomes; printer names, scanner identifiers,
+drivers, paths, and other local configuration remain on the store machine.
 
-The Bay300 server retains the immutable serialized Bill and job metadata. It does not
-retain rendered HTML/PDF. Each requested reprint receives a new job and copy number.
-
-## Store-machine requirements
+## Requirements and installation
 
 - Python 3.11 or newer;
 - an HTTPS connection to `https://bay300.com`;
-- CUPS and a configured printer on Linux (`lpstat -p`, then `lp file.html`);
-- a dedicated non-administrator operating-system account is recommended.
+- Tk/Tkinter for the graphical program;
+- a locally installed printer driver/CUPS queue for current Bill printing.
 
-## Install and enroll
-
-From a checkout of the `bay300grace` tag:
+Install from the deployed source tag on Windows, macOS, or Linux:
 
 ```bash
 git clone https://github.com/yetaai/bay3000.git
 cd bay3000
 git checkout bay300grace
-python3 -m venv ~/.local/share/bay300-print-agent/venv
-~/.local/share/bay300-print-agent/venv/bin/pip install ./apps/print-agent
+python -m venv .bay300da-venv
 ```
 
-In Bay300, open Owner Workspace, show the Store dashboard, open **Bill Printing
-Monitor**, and choose **Generate enrollment code**. Within 15 minutes run:
+Activate and install:
+
+```text
+Windows PowerShell: .\.bay300da-venv\Scripts\Activate.ps1
+macOS/Linux:        source .bay300da-venv/bin/activate
+All platforms:      python -m pip install ./apps/print-agent
+```
+
+On Debian/Ubuntu, install Tk and CUPS first when absent:
 
 ```bash
-~/.local/share/bay300-print-agent/venv/bin/bay300-print-agent enroll \
-  --url https://bay300.com --printer YOUR_CUPS_PRINTER
-~/.local/share/bay300-print-agent/venv/bin/bay300-print-agent doctor
-~/.local/share/bay300-print-agent/venv/bin/bay300-print-agent once
+sudo apt install python3-tk cups-client
 ```
 
-The one-time code is prompted without terminal echo. Configuration containing the device
-token is stored with mode `0600` at
-`~/.config/bay300-print-agent/config.json`. Revoke the agent in Bay300 immediately if
-that file or machine is lost.
-
-## Run continuously with systemd
-
-Install the supplied user unit, then run:
+## Authorize and run
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp apps/print-agent/packaging/bay300-print-agent.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now bay300-print-agent.service
-systemctl --user status bay300-print-agent.service
+bay300da authorize --url https://bay300.com
 ```
 
-Enable user lingering if the agent must run while nobody is logged in:
+Enter an active Store Operator email or telephone login. Bay300 places a request at the top of
+that user's workspace. Open it, choose the correct store, and approve. The program then writes:
+
+```text
+~/.bay300/authorization
+```
+
+The JSON contains the user login as audit metadata and a store-agent authorization token—not a
+browser/user session token. Unix permissions are forced to `0600`. On Windows, `bay300da` removes
+inherited permissions and restricts the file ACL to the running Windows account. The token expires
+after 30 days; run `bay300da authorize` again after expiration.
+
+Open the graphical program:
 
 ```bash
-sudo loginctl enable-linger "$USER"
+bay300da
 ```
 
-PDF and HTML files are under `~/.local/share/bay300-print-agent/{Pending,Printed,Failed}`. The local
-SQLite journal prevents a successfully spooled job from being printed twice after a
-normal restart. A power loss exactly between printer acceptance and acknowledgement is
-inherently ambiguous; inspect the physical output and request an audited reprint rather
-than resetting the old job.
+It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Check device status,
+and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds; Poll server now,
+local configuration changes, task activity, and connectivity recovery reset the cycle.
+
+Headless operation is also available:
+
+```bash
+bay300da doctor
+bay300da once
+bay300da run
+```
+
+Linux users may install `packaging/bay300-device-agent.service` as a systemd user service.
+Windows production packaging should use a signed PyInstaller executable plus Scheduled Task or
+Windows Service; macOS should use a signed/notarized app plus LaunchAgent. The pip installation is
+the portable Grace-pilot distribution.
+
+Rendered Bill PDF/HTML and the idempotency journal remain under `~/.bay300/work`. Reprints are new
+audited server tasks. A processing cancellation is cooperative: the agent checks immediately before
+rendering and immediately before sending output to the local print subsystem.
