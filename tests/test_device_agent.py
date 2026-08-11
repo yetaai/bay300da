@@ -4,10 +4,11 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
 
 from bay300_device_agent.agent import DeviceAgent
-from bay300_device_agent.cli import build_parser,manage_device
+from bay300_device_agent.cli import build_parser,interactive_shell,main,manage_device
 from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
@@ -89,6 +90,31 @@ class DeviceAuthorizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):registry.add("","bill_printer")
             with self.assertRaises(ValueError):registry.add("Front","unsupported")
             with self.assertRaises(KeyError):registry.remove("missing")
+
+    def test_no_subcommand_opens_command_shell_without_requiring_authorization(self):
+        with patch("bay300_device_agent.cli.interactive_shell") as shell:
+            main([])
+        shell.assert_called_once()
+
+    def test_shell_ctrl_c_interrupts_run_and_returns_to_prompt(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_AUTHORIZATION":f"{directory}/authorization",
+            "BAY300DA_WORK":f"{directory}/work",
+        }):
+            save_authorization({"server":"https://bay300.test","storeId":"s1","storeName":"Lovell",
+                                "token":"secret","tokenExpiresAt":"2099-01-01T00:00:00Z"})
+            output=StringIO()
+            with patch("builtins.input",side_effect=["run","exit"]),\
+                 patch("bay300_device_agent.cli.DeviceAgent.run_forever",side_effect=KeyboardInterrupt),\
+                 redirect_stdout(output):
+                interactive_shell(build_parser())
+            self.assertIn("Command interrupted",output.getvalue())
+            self.assertIn("shell closed",output.getvalue())
+
+    def test_platform_run_launchers_open_gui_explicitly(self):
+        packaging=Path(__file__).resolve().parents[1]/"packaging"
+        for relative in ("linux/run.sh","macos/run.command","windows/run.cmd"):
+            self.assertRegex((packaging/relative).read_text(),r"bay300da(?:\.exe|%|\")?.*gui|BAY300DA.*gui")
 
 
 if __name__=="__main__":unittest.main()

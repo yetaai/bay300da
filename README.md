@@ -83,7 +83,7 @@ after 30 days; run `bay300da authorize` again after expiration.
 Open the GUI app:
 
 ```bash
-bay300da
+bay300da gui
 ```
 
 It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Check device status,
@@ -91,6 +91,23 @@ and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds;
 local configuration changes, task activity, and connectivity recovery reset the cycle.
 
 Use the CLI app when that better fits the store computer:
+
+Start the interactive shell by omitting a subcommand:
+
+```text
+$ bay300da
+bay300da> device list
+bay300da> poll
+bay300da> run
+^C
+Command interrupted. Returning to the bay300da prompt.
+bay300da> exit
+```
+
+Within the shell, use `help`, `help device`, or `help device add`. `Ctrl+C` interrupts a running
+command and returns to the prompt. `exit`, `quit`, or `Ctrl+D` closes the shell.
+
+The same operations remain available as one-line commands:
 
 ```bash
 bay300da device list
@@ -108,7 +125,7 @@ bay300da run
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
 prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.
-The GUI remains available explicitly as `bay300da gui` or, for compatibility, as `bay300da`.
+The GUI is available explicitly as `bay300da gui`.
 
 Linux users may install `packaging/bay300-device-agent.service` as a systemd user service.
 Windows production packaging should use a signed PyInstaller executable plus Scheduled Task or

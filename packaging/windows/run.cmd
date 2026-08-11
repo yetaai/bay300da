@@ -5,4 +5,4 @@ if not exist "%BAY300DA%" (
   pause
   exit /b 1
 )
-"%BAY300DA%"
+"%BAY300DA%" gui

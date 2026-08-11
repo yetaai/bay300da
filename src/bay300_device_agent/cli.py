@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import shlex
 import socket
 import time
 
@@ -109,12 +110,11 @@ def manage_device(args,authorization: dict) -> None:
     else:_print_device(row,args.json)
 
 
-def main(argv=None) -> None:
-    parser=build_parser();args=parser.parse_args(argv)
+def dispatch(args) -> None:
     if args.command=="authorize":authorize(args);return
     try:authorization=load_authorization()
     except RuntimeError as error:raise SystemExit(str(error)) from error
-    if args.command in {None,"gui"}:
+    if args.command=="gui":
         try:
             from .gui import run_gui
             run_gui(authorization)
@@ -134,6 +134,39 @@ def main(argv=None) -> None:
         for row in rows:
             checked=registry.check(row["id"]);print(f"- {checked['name']}: {checked['status']} · {checked.get('statusMessage','')}")
         agent.sync()
+
+
+def interactive_shell(parser: argparse.ArgumentParser) -> None:
+    print("Bay300 Devices Admin command shell. Type 'help' for commands; 'exit' or 'quit' to close.")
+    while True:
+        try:line=input("bay300da> ").strip()
+        except EOFError:
+            print();return
+        except KeyboardInterrupt:
+            print("\nInput cancelled. Type 'exit' or 'quit' to close.");continue
+        if not line:continue
+        if line.lower() in {"exit","quit"}:
+            print("Devices Admin shell closed.");return
+        try:tokens=shlex.split(line)
+        except ValueError as error:
+            print(f"Command could not be parsed: {error}");continue
+        if tokens[0].lower()=="help":
+            if len(tokens)==1:parser.print_help();continue
+            tokens=tokens[1:]+["--help"]
+        try:
+            args=parser.parse_args(tokens)
+            if args.command is None:parser.print_help()
+            else:dispatch(args)
+        except KeyboardInterrupt:
+            print("\nCommand interrupted. Returning to the bay300da prompt.")
+        except SystemExit as error:
+            if isinstance(error.code,str):print(error.code)
+
+
+def main(argv=None) -> None:
+    parser=build_parser();args=parser.parse_args(argv)
+    if args.command is None:interactive_shell(parser);return
+    dispatch(args)
 
 
 if __name__=="__main__":main()
