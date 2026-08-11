@@ -9,7 +9,7 @@ drivers, paths, and other local configuration remain on the store machine.
 
 - Python 3.11 or newer;
 - an HTTPS connection to `https://bay300.com`;
-- Tk/Tkinter only when using the Devices Admin window;
+- Tk/Tkinter only when using the GUI app;
 - a locally installed printer driver/CUPS queue for current Bill printing.
 
 Store Owner/OP users should normally open **Device Monitor → Install Devices Admin**. Bay300
@@ -21,20 +21,21 @@ private Bay300 application and contains no service credentials or user authoriza
 Bay300 supports two operating styles. Choose based on how the store computer is used, not on anyone's
 technical experience:
 
-- **Devices Admin window** lets a person add, edit, check, block, and remove local devices. It uses
+- **Install GUI app** lets a person add, edit, check, block, and remove local devices. It uses
   Tkinter, a standard Python window toolkit. You do not need to know Tkinter; the installer only
   checks that the computer has it.
-- **Background-only service** has no window and needs no Tkinter. It is suitable after devices are
+- **Install CLI app** installs command-line operation with no window and needs no Tkinter. It is suitable after devices are
   configured, or when authorization adds one initial Bill printer with `--printer`. It processes
-  queued work with `bay300da run`.
+  queued work with `bay300da run`. Installation does not automatically create a systemd service,
+  macOS LaunchAgent, or Windows service/Scheduled Task.
 
-On Linux or macOS, install for the Devices Admin window in one line:
+On Linux or macOS, install the GUI app in one line:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | bash
 ```
 
-For a background-only service, use:
+Install the CLI app in one line:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | env BAY300DA_HEADLESS=1 bash
@@ -79,7 +80,7 @@ browser/user session token. Unix permissions are forced to `0600`. On Windows, `
 inherited permissions and restricts the file ACL to the running Windows account. The token expires
 after 30 days; run `bay300da authorize` again after expiration.
 
-Open the Devices Admin window:
+Open the GUI app:
 
 ```bash
 bay300da
@@ -89,7 +90,7 @@ It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Ch
 and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds; Poll server now,
 local configuration changes, task activity, and connectivity recovery reset the cycle.
 
-Run without a window when that better fits the store computer:
+Use the CLI app when that better fits the store computer:
 
 ```bash
 bay300da doctor

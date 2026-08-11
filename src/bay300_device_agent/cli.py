@@ -42,7 +42,7 @@ def main() -> None:
     auth=sub.add_parser("authorize",help="Authorize this Devices Admin for one store")
     auth.add_argument("--url",default="https://bay300.com");auth.add_argument("--contact")
     auth.add_argument("--name");auth.add_argument("--printer",help="Add an initial Bill printer")
-    sub.add_parser("run",help="Run headless background polling")
+    sub.add_parser("run",help="Run continuous command-line polling")
     sub.add_parser("once",help="Synchronize devices and handle at most one task")
     sub.add_parser("doctor",help="Check authorization and local device status")
     args=parser.parse_args()

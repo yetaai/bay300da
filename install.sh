@@ -17,7 +17,7 @@ if [ "${BAY300DA_HEADLESS:-0}" != 1 ]; then
     echo 'Tkinter is required for graphical Devices Admin.' >&2
     echo 'Debian/Ubuntu: sudo apt install python3-venv python3-tk' >&2
     echo 'macOS: install a current Python build from https://www.python.org/downloads/macos/' >&2
-    echo 'For a headless-only installation, set BAY300DA_HEADLESS=1.' >&2
+    echo 'To install the CLI app without the GUI, set BAY300DA_HEADLESS=1.' >&2
     exit 1
   }
 fi

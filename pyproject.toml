@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bay300-device-agent"
-version = "0.2.4"
+version = "0.2.5"
 description = "Headless capability-scoped store device agent for Bay300"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
