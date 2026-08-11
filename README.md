@@ -12,12 +12,18 @@ drivers, paths, and other local configuration remain on the store machine.
 - Tk/Tkinter for the graphical program;
 - a locally installed printer driver/CUPS queue for current Bill printing.
 
-Install from the deployed source tag on Windows, macOS, or Linux:
+Store Owner/OP users should normally open **Device Monitor → Install Devices Admin**. Bay300
+provides separate Windows, Linux, and macOS bundles and highlights the likely package based on the
+browser platform. Each bundle contains only this agent project and platform launchers. The stable
+agent-only source tag is `bay300da-grace`; it is separate from the full application recovery tag.
+
+The package launchers are the simplest Grace installation. Advanced users may instead install from
+the agent-only source tag on Windows, macOS, or Linux:
 
 ```bash
-git clone https://github.com/yetaai/bay3000.git
-cd bay3000
-git checkout bay300grace
+curl -L https://github.com/yetaai/bay3000/archive/refs/tags/bay300da-grace.zip \
+  -o bay300da-grace.zip
+# Extract it and enter the extracted directory.
 python -m venv .bay300da-venv
 ```
 
@@ -26,7 +32,7 @@ Activate and install:
 ```text
 Windows PowerShell: .\.bay300da-venv\Scripts\Activate.ps1
 macOS/Linux:        source .bay300da-venv/bin/activate
-All platforms:      python -m pip install ./apps/print-agent
+All platforms:      python -m pip install .
 ```
 
 On Debian/Ubuntu, install Tk and CUPS first when absent:
