@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bay300_print_agent.agent import DeviceAgent
-from bay300_print_agent.client import Bay300Client
-from bay300_print_agent.config import load_authorization,save_authorization
-from bay300_print_agent.devices import DeviceRegistry
+from bay300_device_agent.agent import DeviceAgent
+from bay300_device_agent.client import Bay300Client
+from bay300_device_agent.config import load_authorization,save_authorization
+from bay300_device_agent.devices import DeviceRegistry
 
 
 class FakeResponse:

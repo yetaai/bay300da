@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bay300_print_agent.render import render_html, write_html,write_pdf
+from bay300_device_agent.render import render_html, write_html,write_pdf
 
 
 DOCUMENT = {
