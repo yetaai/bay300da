@@ -17,13 +17,12 @@ provides separate Windows, Linux, and macOS bundles and highlights the likely pa
 browser platform. Each bundle contains only this agent project and platform launchers. The stable
 agent-only source tag is `bay300da-grace`; it is separate from the full application recovery tag.
 
-The package launchers are the simplest Grace installation. Advanced users may instead install from
-the agent-only source tag on Windows, macOS, or Linux:
+The package launchers are the simplest Grace installation. Repository-authorized maintainers may
+instead install from the private agent-only source tag on Windows, macOS, or Linux:
 
 ```bash
-curl -L https://github.com/yetaai/bay3000/archive/refs/tags/bay300da-grace.zip \
-  -o bay300da-grace.zip
-# Extract it and enter the extracted directory.
+git clone --depth 1 --branch bay300da-grace git@github.com:yetaai/bay3000.git bay300da-grace
+cd bay300da-grace
 python -m venv .bay300da-venv
 ```
 
