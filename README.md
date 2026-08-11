@@ -14,24 +14,30 @@ drivers, paths, and other local configuration remain on the store machine.
 
 Store Owner/OP users should normally open **Device Monitor → Install Devices Admin**. Bay300
 provides separate Windows, Linux, and macOS bundles and highlights the likely package based on the
-browser platform. Each bundle contains only this agent project and platform launchers. The stable
-agent-only source tag is `bay300da-grace`; it is separate from the full application recovery tag.
+browser platform. Each bundle contains only this agent project and platform launchers. The public
+agent source is [yetaai/bay300da](https://github.com/yetaai/bay300da); it is separate from the
+private Bay300 application and contains no service credentials or user authorization tokens.
 
-The package launchers are the simplest Grace installation. Repository-authorized maintainers may
-instead install from the private agent-only source tag on Windows, macOS, or Linux:
+On Linux or macOS, install the current public source in one line:
 
 ```bash
-git clone --depth 1 --branch bay300da-grace git@github.com:yetaai/bay300.git bay300da-grace
-cd bay300da-grace
-python -m venv .bay300da-venv
+curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | bash
 ```
 
-Activate and install:
+The installer checks Python and Tkinter, creates a private virtual environment, and places a
+`bay300da` launcher in `~/.local/bin`. It never creates an authorization token. Review the script
+before running it if required by store policy. Windows users should use the ZIP package from Device
+Monitor. A machine intentionally running only `bay300da run` may set `BAY300DA_HEADLESS=1` to skip
+the Tkinter check.
 
-```text
-Windows PowerShell: .\.bay300da-venv\Scripts\Activate.ps1
-macOS/Linux:        source .bay300da-venv/bin/activate
-All platforms:      python -m pip install .
+To install manually from the public repository instead:
+
+```bash
+git clone --depth 1 https://github.com/yetaai/bay300da.git
+cd bay300da
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install .
 ```
 
 On Debian/Ubuntu, install Tk and CUPS first when absent:
