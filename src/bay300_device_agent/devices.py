@@ -11,15 +11,17 @@ from .config import load_devices,save_devices
 
 
 CAPABILITIES={
-    "bill_printer":["bill_print"],"check_printer":["check_print"],
-    "printer":["bill_print","check_print"],"scanner":["scan"],"other":[],
+    "bill_printer":["bill_print"],"check_printer":[],
+    "printer":[],"scanner":[],"other":[],
 }
 
 
 class DeviceRegistry:
     def __init__(self):self.lock=threading.RLock()
     def list(self) -> list[dict]:
-        with self.lock:return load_devices()
+        with self.lock:
+            return [{**row,"capabilities":CAPABILITIES.get(row.get("type"),[])}
+                    for row in load_devices()]
 
     def save(self,devices: list[dict]) -> None:
         with self.lock:save_devices(devices)

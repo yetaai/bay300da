@@ -13,6 +13,7 @@ from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
 from bay300_device_agent.gui_requirements import tkinter_installation_help
+from bay300_device_agent.local_devices import discover_local_devices,print_local_devices
 from bay300_device_agent.uninstall import managed_install_root,uninstall_managed
 
 
@@ -92,6 +93,17 @@ class DeviceAuthorizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):registry.add("","bill_printer")
             with self.assertRaises(ValueError):registry.add("Front","unsupported")
             with self.assertRaises(KeyError):registry.remove("missing")
+            self.assertEqual([],registry.add("Future scanner","scanner")["capabilities"])
+
+    def test_upgrade_removes_stale_executable_capabilities_from_reserved_types(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            Path(f"{directory}/devices.json").write_text(json.dumps([{
+                "id":"legacy","name":"Generic","type":"printer",
+                "capabilities":["bill_print","check_print"],"status":"ready",
+            }]))
+            self.assertEqual([],DeviceRegistry().list()[0]["capabilities"])
 
     def test_no_subcommand_opens_command_shell_without_requiring_authorization(self):
         with patch("bay300_device_agent.cli.interactive_shell") as shell:
@@ -100,11 +112,30 @@ class DeviceAuthorizationTests(unittest.TestCase):
 
     def test_version_subcommand_is_stable_and_needs_no_authorization(self):
         output=StringIO()
-        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.4"),\
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.5.0"),\
              patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
             dispatch(build_parser().parse_args(["version"]))
-        self.assertEqual("bay300da 0.4.4\n",output.getvalue())
+        self.assertEqual("bay300da 0.5.0\n",output.getvalue())
         load.assert_not_called()
+
+    def test_local_discovers_cups_printers_and_sane_document_scanners(self):
+        outputs={("lpstat","-d"):"system default destination: Front-CUPS",
+            ("lpstat","-p"):"printer Front-CUPS is idle. enabled since today\nprinter Back stopped since yesterday",
+            ("scanimage","-L"):"device `airscan:e0:Office Scanner' is WSD Office Scanner ip=10.0.0.8"}
+        with patch("bay300_device_agent.local_devices.shutil.which",side_effect=lambda name:f"/usr/bin/{name}"),\
+             patch("bay300_device_agent.local_devices._run",side_effect=lambda command:outputs.get(tuple(command),"")):
+            rows=discover_local_devices("Linux")
+        self.assertEqual(["printer","printer","scanner"],[row["kind"] for row in rows])
+        self.assertTrue(rows[0]["default"]);self.assertEqual("Front-CUPS",rows[0]["identifier"])
+        self.assertEqual("airscan:e0:Office Scanner",rows[2]["identifier"])
+
+    def test_local_output_is_read_only_and_states_current_support(self):
+        output=StringIO()
+        with redirect_stdout(output):
+            print_local_devices([{"kind":"printer","name":"Front","identifier":"Front-CUPS",
+                "source":"CUPS","default":True,"detail":"idle"}])
+        self.assertIn("does not add or authorize",output.getvalue())
+        self.assertIn("only bill_printer tasks are implemented",output.getvalue())
 
     def test_uninstall_removes_only_managed_program_and_preserves_local_data(self):
         with tempfile.TemporaryDirectory() as directory:

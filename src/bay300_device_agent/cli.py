@@ -50,6 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("version",help="Show the installed bay300da version")
     uninstall=sub.add_parser("uninstall",help="Remove the managed bay300da program")
     uninstall.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
+    local=sub.add_parser("local",help="List locally discovered printers and document scanners")
+    local.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     sub.add_parser("run",help="Run continuous command-line polling")
     sub.add_parser("once",help="Synchronize devices and handle at most one task")
     sub.add_parser("poll",help="Synchronize devices and handle at most one task now")
@@ -123,6 +125,9 @@ def dispatch(args) -> None:
         try:uninstall_managed(args.yes)
         except RuntimeError as error:raise SystemExit(str(error)) from error
         return
+    if args.command=="local":
+        from .local_devices import discover_local_devices,print_local_devices
+        print_local_devices(discover_local_devices(),args.json);return
     if args.command=="authorize":authorize(args);return
     if args.command=="gui":require_tkinter()
     try:authorization=load_authorization()

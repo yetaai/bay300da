@@ -137,10 +137,36 @@ bay300da doctor
 bay300da once
 bay300da run
 bay300da version
+bay300da local
 ```
 
-`bay300da version` prints the installed agent release, such as `bay300da 0.4.4`, and does
+`bay300da version` prints the installed agent release, such as `bay300da 0.5.0`, and does
 not require store authorization.
+
+Discover devices already visible to the operating system without adding them to Bay300:
+
+```bash
+bay300da local
+bay300da local --json
+```
+
+On Linux and macOS, this reads CUPS through `lpstat` and document scanners exposed through SANE's
+`scanimage -L`. On Windows, it reads installed printers and present Image/Camera-class devices from
+PowerShell. Discovery is best-effort and read-only: it does not install drivers, prove that a device
+works, authorize the agent, or create a Bay300 device. Use the discovered CUPS/Windows printer name
+as the `--configuration` value when adding a `bill_printer`, then run `bay300da device check`.
+
+**Only `bill_printer` task processing is implemented today.** `check_printer`, generic `printer`,
+`scanner`, and `other` remain reserved device types and metadata foundations; scanner discovery does
+not mean Bay300 can ingest a scan. The command intentionally does not discover or classify credit-
+card readers as scanners.
+
+A credit-card reader/payment terminal captures payment-account data and is not a document scanner.
+Bay300's current service-payment boundary keeps card processing wholly in the store's external
+terminal and records only the outcome and receiving account. bay300da must not read magnetic-stripe,
+chip, contactless, PIN, PAN, or other cardholder data. Future terminal integration would require a
+specific processor/vendor SDK, tokenized result contract, supported-device policy, PCI assessment,
+tamper/inventory controls, and a separate capability—not the generic `scanner` type.
 
 Remove an installation created by the Bay300 installer:
 
@@ -184,7 +210,8 @@ when a computer is lost, transferred, or suspected compromised; otherwise the cr
 working at its displayed 30-day expiration. Bay300 cannot remotely erase the store computer.
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
-prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.
+prompt. Recognized registry types are `bill_printer`, `check_printer`, `printer`, `scanner`, and
+`other`, but only `bill_printer` has an executable task handler today.
 The GUI is available explicitly as `bay300da gui`.
 
 Linux users may install `packaging/bay300-device-agent.service` as a systemd user service.
