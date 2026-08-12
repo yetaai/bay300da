@@ -41,10 +41,11 @@ Install the CLI app in one line:
 curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | env BAY300DA_HEADLESS=1 bash
 ```
 
-The installer checks the requirements for the selected style, creates a private virtual environment, and places a
-`bay300da` launcher in `~/.local/bin`. It never creates an authorization token. Review the script
-before running it if required by store policy. Windows users should use the ZIP package from Device
-Monitor.
+The installer checks the requirements for the selected style, creates a private virtual environment,
+places a `bay300da` launcher in `~/.local/bin`, and adds that directory to the user's PATH. The PATH
+change is idempotent and applies to newly opened terminals; the installer does not overwrite other
+profile settings. It never creates an authorization token. Review the script before running it if
+required by store policy. Windows users should use the ZIP package from Device Monitor.
 
 To install manually from the public repository instead:
 

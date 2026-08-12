@@ -22,7 +22,8 @@ if [ "${BAY300DA_HEADLESS:-0}" != 1 ]; then
   }
 fi
 
-case $(uname -s) in
+platform=$(uname -s)
+case $platform in
   Darwin) default_root="$HOME/Library/Application Support/Bay300/DevicesAdmin" ;;
   Linux) default_root="${XDG_DATA_HOME:-$HOME/.local/share}/bay300/devices-admin" ;;
   *)
@@ -50,8 +51,28 @@ if [ -e "$launcher" ] && [ ! -L "$launcher" ]; then
 fi
 ln -sfn "$venv/bin/bay300da" "$launcher"
 
+path_profile="$HOME/.profile"
+case $platform:${SHELL##*/} in
+  Darwin:zsh) path_profile="$HOME/.zprofile" ;;
+  Darwin:bash) path_profile="$HOME/.bash_profile" ;;
+  Linux:bash) path_profile="$HOME/.bashrc" ;;
+  Linux:zsh) path_profile="$HOME/.zshrc" ;;
+esac
+path_line='export PATH="$HOME/.local/bin:$PATH"'
+if [ "$bin_dir" = "$HOME/.local/bin" ]; then
+  touch "$path_profile"
+  if ! grep -Fqx "$path_line" "$path_profile"; then
+    {
+      printf '\n%s\n' '# Added by Bay300 Devices Admin'
+      printf '%s\n' "$path_line"
+    } >> "$path_profile"
+  fi
+fi
+
 echo "Bay300 Devices Admin installed at $install_root."
 echo "Run: $launcher authorize --url https://bay300.com"
-if ! command -v bay300da >/dev/null 2>&1; then
-  echo "Add $bin_dir to PATH to run: bay300da"
+if [ "$bin_dir" = "$HOME/.local/bin" ]; then
+  echo "Added $bin_dir to PATH in $path_profile. Open a new terminal, then run: bay300da"
+elif ! command -v bay300da >/dev/null 2>&1; then
+  echo "Custom launcher directory $bin_dir was not added to PATH."
 fi
