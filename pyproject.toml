@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bay300-device-agent"
-version = "0.5.0"
+version = "0.5.1"
 description = "Headless capability-scoped store device agent for Bay300"
 requires-python = ">=3.11"
 license = {text = "Proprietary"}
 authors = [{name = "Bay300"}]
-dependencies = ["reportlab>=4.2,<5"]
+dependencies = [
+    "reportlab>=4.2,<5",
+    "pyreadline3>=3.5,<4; sys_platform == 'win32'",
+]
 
 [project.scripts]
 bay300da = "bay300_device_agent.cli:main"

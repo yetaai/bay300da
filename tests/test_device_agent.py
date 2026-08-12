@@ -8,7 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from bay300_device_agent.agent import DeviceAgent
-from bay300_device_agent.cli import build_parser,dispatch,interactive_shell,main,manage_device
+from bay300_device_agent.cli import (build_parser,dispatch,enable_shell_line_editing,
+                                     interactive_shell,main,manage_device)
 from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
@@ -73,16 +74,16 @@ class DeviceAuthorizationTests(unittest.TestCase):
                     "--configuration","Front-CUPS"]),authorization)
             registry=DeviceRegistry();device_id=registry.list()[0]["id"]
             manage_device(parser.parse_args(["device","edit",device_id,"--name","Reception"]),authorization)
-            manage_device(parser.parse_args(["device","block",device_id]),authorization)
+            manage_device(parser.parse_args(["device","block","rec"]),authorization)
             self.assertEqual("blocked",registry.list()[0]["status"])
-            manage_device(parser.parse_args(["device","unblock",device_id]),authorization)
-            manage_device(parser.parse_args(["device","edit",device_id,"--type","other"]),authorization)
-            manage_device(parser.parse_args(["device","check",device_id]),authorization)
+            manage_device(parser.parse_args(["device","unblock","RECEP"]),authorization)
+            manage_device(parser.parse_args(["device","edit","reception","--type","other"]),authorization)
+            manage_device(parser.parse_args(["device","check","re"]),authorization)
             listing=StringIO()
             with redirect_stdout(listing):
                 manage_device(parser.parse_args(["device","list","--json"]),authorization)
             self.assertEqual("Reception",json.loads(listing.getvalue())[0]["name"])
-            manage_device(parser.parse_args(["device","remove",device_id,"--yes"]),authorization)
+            manage_device(parser.parse_args(["device","remove","rece","--yes"]),authorization)
             self.assertEqual([],registry.list());self.assertEqual(7,sync.call_count)
 
     def test_registry_rejects_invalid_cli_and_gui_values(self):
@@ -94,6 +95,28 @@ class DeviceAuthorizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):registry.add("Front","unsupported")
             with self.assertRaises(KeyError):registry.remove("missing")
             self.assertEqual([],registry.add("Future scanner","scanner")["capabilities"])
+
+    def test_registry_resolves_unique_case_insensitive_name_prefix(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            registry=DeviceRegistry()
+            front=registry.add("Front-CUPS","bill_printer")
+            registry.add("Back Office","bill_printer")
+            self.assertEqual(front["id"],registry.resolve("fRoNt")["id"])
+            self.assertEqual(front["id"],registry.resolve(front["id"])["id"])
+
+    def test_registry_rejects_missing_or_ambiguous_name_prefix(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            registry=DeviceRegistry()
+            registry.add("Front Counter","bill_printer")
+            registry.add("Front Office","bill_printer")
+            with self.assertRaisesRegex(ValueError,"ambiguous: Front Counter, Front Office"):
+                registry.resolve("FRONT")
+            with self.assertRaisesRegex(ValueError,"No local device matches"):
+                registry.resolve("missing")
 
     def test_upgrade_removes_stale_executable_capabilities_from_reserved_types(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
@@ -112,10 +135,10 @@ class DeviceAuthorizationTests(unittest.TestCase):
 
     def test_version_subcommand_is_stable_and_needs_no_authorization(self):
         output=StringIO()
-        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.5.0"),\
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.5.1"),\
              patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
             dispatch(build_parser().parse_args(["version"]))
-        self.assertEqual("bay300da 0.5.0\n",output.getvalue())
+        self.assertEqual("bay300da 0.5.1\n",output.getvalue())
         load.assert_not_called()
 
     def test_local_discovers_cups_printers_and_sane_document_scanners(self):
@@ -173,6 +196,22 @@ class DeviceAuthorizationTests(unittest.TestCase):
                 interactive_shell(build_parser())
             self.assertIn("Command interrupted",output.getvalue())
             self.assertIn("shell closed",output.getvalue())
+
+    def test_shell_enables_terminal_line_editing_before_first_prompt(self):
+        with patch("bay300_device_agent.cli.enable_shell_line_editing",return_value=True) as enable,\
+             patch("builtins.input",return_value="exit"):
+            interactive_shell(build_parser())
+        enable.assert_called_once_with()
+
+    def test_shell_line_editing_loads_readline(self):
+        readline=type("Readline",(),{
+            "set_auto_history":lambda self,value:setattr(self,"auto_history",value),
+            "set_history_length":lambda self,value:setattr(self,"history_length",value),
+        })()
+        with patch("bay300_device_agent.cli.importlib.import_module",return_value=readline) as load:
+            self.assertTrue(enable_shell_line_editing())
+        load.assert_called_once_with("readline")
+        self.assertTrue(readline.auto_history);self.assertEqual(200,readline.history_length)
 
     def test_platform_run_launchers_open_gui_explicitly(self):
         packaging=Path(__file__).resolve().parents[1]/"packaging"

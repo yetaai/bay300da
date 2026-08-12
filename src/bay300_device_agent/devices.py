@@ -37,6 +37,20 @@ class DeviceRegistry:
                  "configuration":configuration.strip(),"statusMessage":"Not checked yet"}
             devices.append(row);self.save(devices);return row
 
+    def resolve(self,selector: str) -> dict:
+        """Resolve an exact ID or one unambiguous case-insensitive device-name prefix."""
+        clean_selector=selector.strip()
+        if not clean_selector:raise ValueError("Device name or ID is required")
+        devices=self.list()
+        exact_id=next((row for row in devices if row["id"]==clean_selector),None)
+        if exact_id:return exact_id
+        folded=clean_selector.casefold()
+        matches=[row for row in devices if row["name"].casefold().startswith(folded)]
+        if len(matches)==1:return matches[0]
+        if not matches:raise ValueError(f"No local device matches '{clean_selector}'")
+        names=", ".join(sorted(row["name"] for row in matches))
+        raise ValueError(f"Device name prefix '{clean_selector}' is ambiguous: {names}")
+
     def update(self,device_id: str,**changes) -> dict:
         with self.lock:
             if "name" in changes:

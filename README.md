@@ -120,7 +120,8 @@ bay300da> exit
 ```
 
 Within the shell, use `help`, `help device`, or `help device add`. `Ctrl+C` interrupts a running
-command and returns to the prompt. `exit`, `quit`, or `Ctrl+D` closes the shell.
+command and returns to the prompt. The arrow keys move the cursor and browse command history.
+`exit`, `quit`, or `Ctrl+D` closes the shell.
 
 The same operations remain available as one-line commands:
 
@@ -140,7 +141,12 @@ bay300da version
 bay300da local
 ```
 
-`bay300da version` prints the installed agent release, such as `bay300da 0.5.0`, and does
+Commands that identify a configured local device accept its full ID or a unique,
+case-insensitive leading part of its name. For example, `bay300da device check front` selects
+`Front-CUPS` when no other configured device name starts with `front`. The command stops and lists
+the matching names when the prefix is ambiguous; it never guesses.
+
+`bay300da version` prints the installed agent release, such as `bay300da 0.5.1`, and does
 not require store authorization.
 
 Discover devices already visible to the operating system without adding them to Bay300:

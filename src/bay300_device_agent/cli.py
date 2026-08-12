@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.metadata
 import json
 import platform
 import shlex
 import socket
+import sys
 import time
 
 from .agent import DeviceAgent
@@ -65,13 +67,16 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--configuration",default="",help="Printer name, scanner identifier, or local configuration")
     add.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     edit=actions.add_parser("edit",help="Edit a local device")
-    edit.add_argument("device_id");edit.add_argument("--name");edit.add_argument("--type",choices=tuple(CAPABILITIES))
+    edit.add_argument("device",help="Full device ID or unique case-insensitive name prefix")
+    edit.add_argument("--name");edit.add_argument("--type",choices=tuple(CAPABILITIES))
     edit.add_argument("--configuration");edit.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     remove=actions.add_parser("remove",help="Remove a local device while retaining server task history")
-    remove.add_argument("device_id");remove.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
+    remove.add_argument("device",help="Full device ID or unique case-insensitive name prefix")
+    remove.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
     for action_name in ("block","unblock","check"):
         action=actions.add_parser(action_name,help=f"{action_name.capitalize()} a local device")
-        action.add_argument("device_id");action.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+        action.add_argument("device",help="Full device ID or unique case-insensitive name prefix")
+        action.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     return parser
 
 
@@ -94,26 +99,29 @@ def manage_device(args,authorization: dict) -> None:
     try:
         if args.device_command=="add":
             row=registry.add(args.name,args.type,args.configuration)
-        elif args.device_command=="edit":
+        else:
+            selected=registry.resolve(args.device)
+            device_id=selected["id"]
+        if args.device_command=="edit":
             changes={key:value for key,value in {
                 "name":args.name,"type":args.type,"configuration":args.configuration,
             }.items() if value is not None}
             if not changes:raise SystemExit("Specify --name, --type, or --configuration to edit.")
-            row=registry.update(args.device_id,**changes)
+            row=registry.update(device_id,**changes)
         elif args.device_command=="remove":
-            if not args.yes and input(f"Remove local device {args.device_id}? [y/N] ").strip().lower() not in {"y","yes"}:
+            if not args.yes and input(f"Remove local device {selected['name']}? [y/N] ").strip().lower() not in {"y","yes"}:
                 print("Device removal cancelled.");return
-            registry.remove(args.device_id);row=None
-        elif args.device_command=="block":row=registry.block(args.device_id,True)
-        elif args.device_command=="unblock":row=registry.block(args.device_id,False)
-        else:row=registry.check(args.device_id)
+            registry.remove(device_id);row=None
+        elif args.device_command=="block":row=registry.block(device_id,True)
+        elif args.device_command=="unblock":row=registry.block(device_id,False)
+        elif args.device_command=="check":row=registry.check(device_id)
     except (KeyError,ValueError) as error:
         message=error.args[0] if error.args else str(error)
         raise SystemExit(f"Device change failed: {message}") from error
     try:DeviceAgent(authorization,registry).sync()
     except Exception as error:
         raise SystemExit(f"Local device change was saved, but server synchronization failed: {error}") from error
-    if row is None:print(f"Removed {args.device_id}; server task history is retained.")
+    if row is None:print(f"Removed {selected['name']}; server task history is retained.")
     else:_print_device(row,args.json)
 
 
@@ -152,8 +160,22 @@ def dispatch(args) -> None:
         agent.sync()
 
 
+def enable_shell_line_editing() -> bool:
+    """Activate cursor movement and command history for Python's input prompt."""
+    try:
+        readline=importlib.import_module("readline")
+    except ImportError:
+        return False
+    if hasattr(readline,"set_auto_history"):readline.set_auto_history(True)
+    if hasattr(readline,"set_history_length"):readline.set_history_length(200)
+    return True
+
+
 def interactive_shell(parser: argparse.ArgumentParser) -> None:
+    line_editing=enable_shell_line_editing()
     print("Bay300 Devices Admin command shell. Type 'help' for commands; 'exit' or 'quit' to close.")
+    if not line_editing and getattr(sys.stdin,"isatty",lambda:False)():
+        print("Terminal cursor editing is unavailable in this Python installation.")
     while True:
         try:line=input("bay300da> ").strip()
         except EOFError:
