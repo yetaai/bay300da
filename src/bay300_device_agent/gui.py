@@ -6,6 +6,7 @@ from tkinter import messagebox,simpledialog,ttk
 
 from .agent import DeviceAgent
 from .devices import CAPABILITIES,DeviceRegistry
+from .local_devices import normalize_local_configuration
 
 
 class DevicesAdmin:
@@ -48,7 +49,10 @@ class DevicesAdmin:
         device_type=self.ask_type()
         if not device_type:return
         config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",parent=self.root) or ""
-        self.registry.add(name,device_type,config);self.changed()
+        try:
+            configuration=normalize_local_configuration(config or name,device_type)
+            self.registry.add(name,device_type,configuration);self.changed()
+        except ValueError as error:messagebox.showerror("Local device selection",str(error))
 
     def remove(self):
         item=self.selected()
@@ -65,7 +69,10 @@ class DevicesAdmin:
         device_type=self.ask_type(row["type"])
         if not device_type:return
         config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",initialvalue=row.get("configuration",""),parent=self.root)
-        self.registry.update(item,name=name,type=device_type,configuration=config or "");self.changed()
+        try:
+            configuration=normalize_local_configuration(config or "",device_type)
+            self.registry.update(item,name=name,type=device_type,configuration=configuration);self.changed()
+        except ValueError as error:messagebox.showerror("Local device selection",str(error))
 
     def block(self):
         item=self.selected()

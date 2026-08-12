@@ -68,6 +68,26 @@ def discover_local_devices(system: str | None=None) -> list[dict]:
     return _cups_printers()+_sane_scanners()
 
 
+def normalize_local_configuration(selector: str,device_type: str,
+                                  rows: list[dict] | None=None) -> str:
+    """Expand one case-insensitive local-device prefix to its complete identifier."""
+    clean=selector.strip()
+    if not clean:return ""
+    kind="scanner" if device_type=="scanner" else (
+        "printer" if device_type in {"bill_printer","check_printer","printer"} else None)
+    if kind is None:return clean
+    local_rows=discover_local_devices() if rows is None else rows
+    folded=clean.casefold()
+    matches=[row for row in local_rows if row.get("kind")==kind and any(
+        str(row.get(key) or "").casefold().startswith(folded) for key in ("name","identifier")
+    )]
+    if len(matches)==1:return str(matches[0]["identifier"])
+    if len(matches)>1:
+        names=", ".join(sorted(str(row.get("name") or row.get("identifier")) for row in matches))
+        raise ValueError(f"Local {kind} prefix '{clean}' is ambiguous: {names}")
+    return clean
+
+
 def print_local_devices(rows: list[dict],json_output: bool=False) -> None:
     if json_output:
         print(json.dumps(rows,sort_keys=True));return

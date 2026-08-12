@@ -15,6 +15,7 @@ from .client import Bay300Client
 from .config import authorization_path,load_authorization,save_authorization
 from .devices import CAPABILITIES,DeviceRegistry
 from .gui_requirements import require_tkinter
+from .local_devices import normalize_local_configuration
 
 
 def authorize(args) -> None:
@@ -98,13 +99,17 @@ def manage_device(args,authorization: dict) -> None:
         return
     try:
         if args.device_command=="add":
-            row=registry.add(args.name,args.type,args.configuration)
+            selector=args.configuration or args.name
+            configuration=normalize_local_configuration(selector,args.type)
+            row=registry.add(args.name,args.type,configuration)
         else:
             selected=registry.resolve(args.device)
             device_id=selected["id"]
         if args.device_command=="edit":
+            configuration=(normalize_local_configuration(args.configuration,args.type or selected["type"])
+                           if args.configuration is not None else None)
             changes={key:value for key,value in {
-                "name":args.name,"type":args.type,"configuration":args.configuration,
+                "name":args.name,"type":args.type,"configuration":configuration,
             }.items() if value is not None}
             if not changes:raise SystemExit("Specify --name, --type, or --configuration to edit.")
             row=registry.update(device_id,**changes)

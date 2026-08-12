@@ -14,7 +14,9 @@ from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
 from bay300_device_agent.gui_requirements import tkinter_installation_help
-from bay300_device_agent.local_devices import discover_local_devices,print_local_devices
+from bay300_device_agent.local_devices import (discover_local_devices,
+                                                normalize_local_configuration,
+                                                print_local_devices)
 from bay300_device_agent.uninstall import managed_install_root,uninstall_managed
 
 
@@ -86,6 +88,33 @@ class DeviceAuthorizationTests(unittest.TestCase):
             manage_device(parser.parse_args(["device","remove","rece","--yes"]),authorization)
             self.assertEqual([],registry.list());self.assertEqual(7,sync.call_count)
 
+    def test_add_expands_unique_local_printer_prefix_to_complete_identifier(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }),patch("bay300_device_agent.local_devices.discover_local_devices",return_value=[
+            {"kind":"printer","name":"PDFwriter","identifier":"PDFwriter"},
+        ]),patch("bay300_device_agent.cli.DeviceAgent.sync"):
+            parser=build_parser();authorization={"server":"https://bay300.test","token":"secret"}
+            manage_device(parser.parse_args([
+                "device","add","--name","pdf","--type","bill_printer",
+            ]),authorization)
+            manage_device(parser.parse_args([
+                "device","add","--name","PDF test","--type","bill_printer","--configuration","PdF",
+            ]),authorization)
+            self.assertEqual(["PDFwriter","PDFwriter"],[
+                row["configuration"] for row in DeviceRegistry().list()
+            ])
+
+    def test_local_configuration_prefix_must_be_unambiguous(self):
+        rows=[
+            {"kind":"printer","name":"PDFwriter","identifier":"PDFwriter"},
+            {"kind":"printer","name":"PDF warehouse","identifier":"PDF_warehouse"},
+        ]
+        with self.assertRaisesRegex(ValueError,"ambiguous: PDF warehouse, PDFwriter"):
+            normalize_local_configuration("pdf","bill_printer",rows)
+        self.assertEqual("remote-queue",normalize_local_configuration(
+            "remote-queue","bill_printer",rows))
+
     def test_registry_rejects_invalid_cli_and_gui_values(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
             "BAY300DA_DEVICES":f"{directory}/devices.json",
@@ -135,10 +164,10 @@ class DeviceAuthorizationTests(unittest.TestCase):
 
     def test_version_subcommand_is_stable_and_needs_no_authorization(self):
         output=StringIO()
-        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.5.1"),\
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.5.2"),\
              patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
             dispatch(build_parser().parse_args(["version"]))
-        self.assertEqual("bay300da 0.5.1\n",output.getvalue())
+        self.assertEqual("bay300da 0.5.2\n",output.getvalue())
         load.assert_not_called()
 
     def test_local_discovers_cups_printers_and_sane_document_scanners(self):

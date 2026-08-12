@@ -146,7 +146,12 @@ case-insensitive leading part of its name. For example, `bay300da device check f
 `Front-CUPS` when no other configured device name starts with `front`. The command stops and lists
 the matching names when the prefix is ambiguous; it never guesses.
 
-`bay300da version` prints the installed agent release, such as `bay300da 0.5.1`, and does
+When adding or editing a printer, the local configuration may also be a unique,
+case-insensitive prefix from `bay300da local`. Bay300da expands it before saving: configuration
+`pdf` becomes the complete CUPS identifier `PDFwriter` when that is the only local printer match.
+The Bay300 display name remains independent and may stay `pdf` or any other useful store-facing name.
+
+`bay300da version` prints the installed agent release, such as `bay300da 0.5.2`, and does
 not require store authorization.
 
 Discover devices already visible to the operating system without adding them to Bay300:
