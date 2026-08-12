@@ -22,8 +22,9 @@ Bay300 supports two operating styles. Choose based on how the store computer is 
 technical experience:
 
 - **Install GUI app** lets a person add, edit, check, block, and remove local devices. It uses
-  Tkinter, a standard Python window toolkit. You do not need to know Tkinter; the installer only
-  checks that the computer has it.
+  Tkinter, a standard Python window toolkit. You do not need to know or configure Tkinter. If it
+  is absent, installation still completes and prints the platform-specific next step. Running
+  `bay300da gui` repeats that guidance until Tkinter is available.
 - **Install CLI app** installs command-line operation with no window and needs no Tkinter. It can
   authorize, add, list, edit, remove, block, unblock, and check devices, synchronize immediately,
   and process queued work with `bay300da run`. Installation does not automatically create a systemd service,
@@ -44,8 +45,10 @@ curl -fsSL https://raw.githubusercontent.com/yetaai/bay300da/main/install.sh | e
 The installer checks the requirements for the selected style, creates a private virtual environment,
 places a `bay300da` launcher in `~/.local/bin`, and adds that directory to the user's PATH. The PATH
 change is idempotent and applies to newly opened terminals; the installer does not overwrite other
-profile settings. It never creates an authorization token. Review the script before running it if
-required by store policy. Windows users should use the ZIP package from Device Monitor.
+profile settings. A missing Tkinter installation does not prevent the CLI from working. At the end
+of a GUI installation, the installer prints the command or action needed to add Tkinter. It never
+creates an authorization token. Review the script before running it if required by store policy.
+Windows users should use the ZIP package from Device Monitor.
 
 To install manually from the public repository instead:
 
@@ -62,6 +65,14 @@ On Debian/Ubuntu, install Tk and CUPS first when absent:
 ```bash
 sudo apt install python3-tk cups-client
 ```
+
+Installing operating-system packages usually requires `sudo` on Linux. Fedora/RHEL normally uses
+`sudo dnf install python3-tkinter`; Arch normally uses `sudo pacman -S tk`. On macOS, use a current
+Homebrew formula matching the agent's Python—for example, `brew install python-tk@3.13`—or use a
+current python.org Python build that includes Tcl/Tk; `sudo` is normally unnecessary. On Windows, open the
+official Python installer, choose **Modify**, and enable **tcl/tk and IDLE**. These are operating-
+system/Python-distribution components, so Tkinter is deliberately not declared as a pip dependency.
+The displayed error also suggests the exact question to enter in **Ask Bay300 Help** for more detail.
 
 ## Authorize and run
 
@@ -86,6 +97,9 @@ Open the GUI app:
 ```bash
 bay300da gui
 ```
+
+If Tkinter is unavailable, this command exits with the appropriate installation command or action
+and does not require an existing Bay300 authorization first.
 
 It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Check device status,
 and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds; Poll server now,
@@ -122,7 +136,11 @@ bay300da poll
 bay300da doctor
 bay300da once
 bay300da run
+bay300da version
 ```
+
+`bay300da version` prints the installed agent release, such as `bay300da 0.4.2`, and does
+not require store authorization.
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
 prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.

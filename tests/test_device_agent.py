@@ -8,10 +8,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from bay300_device_agent.agent import DeviceAgent
-from bay300_device_agent.cli import build_parser,interactive_shell,main,manage_device
+from bay300_device_agent.cli import build_parser,dispatch,interactive_shell,main,manage_device
 from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
+from bay300_device_agent.gui_requirements import tkinter_installation_help
 
 
 class FakeResponse:
@@ -96,6 +97,14 @@ class DeviceAuthorizationTests(unittest.TestCase):
             main([])
         shell.assert_called_once()
 
+    def test_version_subcommand_is_stable_and_needs_no_authorization(self):
+        output=StringIO()
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.2"),\
+             patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
+            dispatch(build_parser().parse_args(["version"]))
+        self.assertEqual("bay300da 0.4.2\n",output.getvalue())
+        load.assert_not_called()
+
     def test_shell_ctrl_c_interrupts_run_and_returns_to_prompt(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
             "BAY300DA_AUTHORIZATION":f"{directory}/authorization",
@@ -115,6 +124,27 @@ class DeviceAuthorizationTests(unittest.TestCase):
         packaging=Path(__file__).resolve().parents[1]/"packaging"
         for relative in ("linux/run.sh","macos/run.command","windows/run.cmd"):
             self.assertRegex((packaging/relative).read_text(),r"bay300da(?:\.exe|%|\")?.*gui|BAY300DA.*gui")
+
+    def test_missing_tkinter_help_is_platform_specific(self):
+        self.assertIn("sudo apt install python3-tk",
+                      tkinter_installation_help("Linux","ubuntu debian"))
+        self.assertIn("sudo dnf install python3-tkinter",
+                      tkinter_installation_help("Linux","fedora"))
+        self.assertIn("python.org/downloads/macos",tkinter_installation_help("Darwin"))
+        self.assertIn(f"brew install python-tk@{os.sys.version_info.major}.{os.sys.version_info.minor}",
+                      tkinter_installation_help("Darwin"))
+        self.assertIn("Ask Bay300 Help",tkinter_installation_help("Darwin"))
+        windows=tkinter_installation_help("Windows")
+        self.assertIn("tcl/tk and IDLE",windows)
+        self.assertIn("Administrator access is normally not required",windows)
+
+    def test_gui_reports_missing_tkinter_before_requiring_authorization(self):
+        args=build_parser().parse_args(["gui"])
+        with patch("bay300_device_agent.cli.require_tkinter",
+                   side_effect=SystemExit("install tkinter")),\
+             patch("bay300_device_agent.cli.load_authorization") as load:
+            with self.assertRaisesRegex(SystemExit,"install tkinter"):dispatch(args)
+        load.assert_not_called()
 
 
 if __name__=="__main__":unittest.main()

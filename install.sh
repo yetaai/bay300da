@@ -12,16 +12,6 @@ fi
   echo 'Python 3.11 or newer is required.' >&2
   exit 1
 }
-if [ "${BAY300DA_HEADLESS:-0}" != 1 ]; then
-  "$python_command" -c 'import tkinter' >/dev/null 2>&1 || {
-    echo 'Tkinter is required for graphical Devices Admin.' >&2
-    echo 'Debian/Ubuntu: sudo apt install python3-venv python3-tk' >&2
-    echo 'macOS: install a current Python build from https://www.python.org/downloads/macos/' >&2
-    echo 'To install the CLI app without the GUI, set BAY300DA_HEADLESS=1.' >&2
-    exit 1
-  }
-fi
-
 platform=$(uname -s)
 case $platform in
   Darwin) default_root="$HOME/Library/Application Support/Bay300/DevicesAdmin" ;;
@@ -75,4 +65,30 @@ if [ "$bin_dir" = "$HOME/.local/bin" ]; then
   echo "Added $bin_dir to PATH in $path_profile. Open a new terminal, then run: bay300da"
 elif ! command -v bay300da >/dev/null 2>&1; then
   echo "Custom launcher directory $bin_dir was not added to PATH."
+fi
+if [ "${BAY300DA_HEADLESS:-0}" != 1 ] && ! "$venv/bin/python" -c 'import tkinter' >/dev/null 2>&1; then
+  echo
+  echo 'Tkinter is not installed, so the GUI cannot start yet.'
+  case $platform in
+    Linux)
+      if [ -r /etc/os-release ] && grep -Eiq '^(ID|ID_LIKE)=.*(debian|ubuntu)' /etc/os-release; then
+        echo 'Install it, then run bay300da gui again: sudo apt install python3-tk'
+      elif [ -r /etc/os-release ] && grep -Eiq '^(ID|ID_LIKE)=.*(fedora|rhel|centos)' /etc/os-release; then
+        echo 'Install it, then run bay300da gui again: sudo dnf install python3-tkinter'
+      elif [ -r /etc/os-release ] && grep -Eiq '^(ID|ID_LIKE)=.*arch' /etc/os-release; then
+        echo 'Install it, then run bay300da gui again: sudo pacman -S tk'
+      else
+        echo "Install your Linux distribution's Tkinter/Tcl-Tk package, usually with sudo."
+      fi ;;
+    Darwin)
+      python_version=$("$venv/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+      echo 'If this Python was installed with Homebrew, run:'
+      echo "  brew install python-tk@$python_version"
+      echo 'Then run bay300da gui again.'
+      echo 'If Homebrew does not manage this Python, install a current Python from:'
+      echo 'https://www.python.org/downloads/macos/'
+      echo 'Then reinstall bay300da. sudo is normally not needed.' ;;
+  esac
+  echo "Ask Bay300 Help: How do I install Tkinter for bay300da on $platform?"
+  echo 'CLI commands are already available without Tkinter.'
 fi

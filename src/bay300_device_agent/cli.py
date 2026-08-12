@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import platform
 import shlex
@@ -11,6 +12,7 @@ from .agent import DeviceAgent
 from .client import Bay300Client
 from .config import authorization_path,load_authorization,save_authorization
 from .devices import CAPABILITIES,DeviceRegistry
+from .gui_requirements import require_tkinter
 
 
 def authorize(args) -> None:
@@ -45,6 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     auth.add_argument("--url",default="https://bay300.com");auth.add_argument("--contact")
     auth.add_argument("--name");auth.add_argument("--printer",help="Add an initial Bill printer")
     sub.add_parser("gui",help="Open the Devices Admin GUI app")
+    sub.add_parser("version",help="Show the installed bay300da version")
     sub.add_parser("run",help="Run continuous command-line polling")
     sub.add_parser("once",help="Synchronize devices and handle at most one task")
     sub.add_parser("poll",help="Synchronize devices and handle at most one task now")
@@ -111,14 +114,15 @@ def manage_device(args,authorization: dict) -> None:
 
 
 def dispatch(args) -> None:
+    if args.command=="version":
+        print(f"bay300da {importlib.metadata.version('bay300-device-agent')}");return
     if args.command=="authorize":authorize(args);return
+    if args.command=="gui":require_tkinter()
     try:authorization=load_authorization()
     except RuntimeError as error:raise SystemExit(str(error)) from error
     if args.command=="gui":
-        try:
-            from .gui import run_gui
-            run_gui(authorization)
-        except ImportError as error:raise SystemExit("Tkinter is required for the graphical Devices Admin") from error
+        from .gui import run_gui
+        run_gui(authorization)
         return
     if args.command=="device":manage_device(args,authorization);return
     agent=DeviceAgent(authorization)

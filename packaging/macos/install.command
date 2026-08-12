@@ -8,10 +8,6 @@ python3 -c 'import sys; assert sys.version_info >= (3,11)' || {
   echo 'Python 3.11 or newer is required.' >&2
   exit 1
 }
-python3 -c 'import tkinter' >/dev/null 2>&1 || {
-  echo 'This Python installation does not include Tkinter. Use the current python.org macOS installer.' >&2
-  exit 1
-}
 install_root="$HOME/Library/Application Support/Bay300/DevicesAdmin"
 bin_dir="$HOME/.local/bin"
 python3 -m venv "$install_root/venv"
@@ -28,3 +24,16 @@ fi
 echo 'Bay300 Devices Admin installed.'
 echo "Added $bin_dir to PATH in $profile. Open a new terminal to run bay300da by name."
 echo 'Next run authorize.command, then run.command.'
+if ! "$install_root/venv/bin/python" -c 'import tkinter' >/dev/null 2>&1; then
+  python_version=$("$install_root/venv/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  echo
+  echo 'Tkinter is not installed, so the GUI cannot start yet.'
+  echo 'If this Python was installed with Homebrew, run:'
+  echo "  brew install python-tk@$python_version"
+  echo 'Then run bay300da gui again.'
+  echo 'If Homebrew does not manage this Python, install a current Python from:'
+  echo 'https://www.python.org/downloads/macos/'
+  echo 'Then reinstall bay300da. sudo is normally not needed.'
+  echo 'Ask Bay300 Help: How do I install Tkinter for bay300da on macOS?'
+  echo 'CLI commands are already available without Tkinter.'
+fi

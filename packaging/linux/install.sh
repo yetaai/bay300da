@@ -8,10 +8,6 @@ python3 -c 'import sys; assert sys.version_info >= (3,11)' || {
   echo 'Python 3.11 or newer is required.' >&2
   exit 1
 }
-python3 -c 'import tkinter' >/dev/null 2>&1 || {
-  echo 'Tkinter is required. On Debian/Ubuntu run: sudo apt install python3-tk' >&2
-  exit 1
-}
 install_root="${XDG_DATA_HOME:-$HOME/.local/share}/bay300/devices-admin"
 bin_dir="$HOME/.local/bin"
 python3 -m venv "$install_root/venv"
@@ -31,3 +27,11 @@ fi
 echo 'Bay300 Devices Admin installed.'
 echo "Added $bin_dir to PATH in $profile. Open a new terminal to run bay300da by name."
 echo 'Next run ./authorize.sh, then ./run.sh.'
+if ! "$install_root/venv/bin/python" -c 'import tkinter' >/dev/null 2>&1; then
+  echo
+  echo 'Tkinter is not installed, so the GUI cannot start yet.'
+  echo 'On Debian/Ubuntu install it, then run bay300da gui again:'
+  echo '  sudo apt install python3-tk'
+  echo 'Ask Bay300 Help: How do I install Tkinter for bay300da on Linux?'
+  echo 'CLI commands are already available without Tkinter.'
+fi
