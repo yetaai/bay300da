@@ -100,10 +100,10 @@ class DeviceAuthorizationTests(unittest.TestCase):
 
     def test_version_subcommand_is_stable_and_needs_no_authorization(self):
         output=StringIO()
-        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.3"),\
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.4"),\
              patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
             dispatch(build_parser().parse_args(["version"]))
-        self.assertEqual("bay300da 0.4.3\n",output.getvalue())
+        self.assertEqual("bay300da 0.4.4\n",output.getvalue())
         load.assert_not_called()
 
     def test_uninstall_removes_only_managed_program_and_preserves_local_data(self):

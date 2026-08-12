@@ -139,7 +139,7 @@ bay300da run
 bay300da version
 ```
 
-`bay300da version` prints the installed agent release, such as `bay300da 0.4.3`, and does
+`bay300da version` prints the installed agent release, such as `bay300da 0.4.4`, and does
 not require store authorization.
 
 Remove an installation created by the Bay300 installer:
@@ -148,13 +148,40 @@ Remove an installation created by the Bay300 installer:
 bay300da uninstall
 ```
 
-The command confirms the managed installation directory before removing the program and its
-`~/.local/bin/bay300da` launcher. Use `bay300da uninstall --yes` for a non-interactive removal.
-It deliberately preserves `~/.bay300/authorization`, `devices.json`, and rendered work so an
-uninstall cannot silently destroy store configuration or output. If the computer is being retired,
-revoke its Devices Admin authorization from Bay300 Device Monitor first. A manually installed,
-pipx-managed, or development copy refuses managed uninstall and must be removed with its own package
-manager.
+Stop `bay300da run`, close the GUI, and finish or cancel device tasks before uninstalling. The
+command confirms the managed installation directory before removing the program and its
+`~/.local/bin/bay300da` launcher. Use `bay300da uninstall --yes` only when that confirmation has
+already been handled by automation. A manually installed, pipx-managed, or development copy refuses
+managed uninstall and must be removed with its own package manager. Manually configured systemd,
+LaunchAgent, Windows service, or Scheduled Task definitions are outside the portable installer and
+must be stopped and removed separately.
+
+### Choose the intended uninstall outcome
+
+| Intention | Safe sequence | What happens later |
+|---|---|---|
+| Reinstall or repair for the same OS user | Run `bay300da uninstall`, keep `~/.bay300`, reinstall, then run `bay300da doctor`. | Device IDs and local configuration are reused. If the 30-day credential expired or was revoked, authorize again. |
+| Retire or transfer the computer | Finish/cancel tasks; while the agent still works, remove its devices with `bay300da device remove DEVICE_ID`; poll so the server mirror becomes Removed; request immediate credential revocation from the Bay300 site administrator when needed; uninstall. | Historical tasks remain auditable. A replacement computer must authorize and configure its own devices. Without administrator revocation, the credential expires at its recorded 30-day limit. |
+| Deliberately clean local Bay300 information | Complete the retirement sequence, then separately delete `~/.bay300` according to store retention policy. Also clean OS printer queues, drivers, spool/cache files, downloaded packages, and backups as required. | Authorization, device definitions, rendered output, and the local idempotency journal cannot be recovered from Bay300. Server audit/task history is retained. |
+
+Normal uninstall deliberately preserves `~/.bay300/authorization`, `devices.json`, and rendered
+work. This prevents a software repair from silently forcing device re-entry or losing output, but
+it is **not** a security wipe. Do not copy `authorization` to another person or computer; authorize
+the replacement normally. Copying `devices.json` to different hardware is also unreliable because
+printer names and scanner identifiers are machine-local.
+
+Bay300 stores a read-only operational mirror—device name, type, capabilities, state, and task
+outcomes—not local drivers, paths, printer queues, scanner identifiers, or complete configuration.
+The server is not a backup of `~/.bay300`, and Bay300 support cannot reconstruct information that
+the agent never uploaded. Secure deletion on SSDs, synchronized folders, or backed-up home
+directories depends on the computer and backup provider; follow the store's own retention and
+device-disposal process.
+
+The current Grace Device Monitor is a read-only mirror and does not expose self-service agent
+credential revocation. Removing a local device and polling marks that device mirror Removed, but it
+does not revoke the agent credential. Ask the Bay300 site administrator for immediate revocation
+when a computer is lost, transferred, or suspected compromised; otherwise the credential stops
+working at its displayed 30-day expiration. Bay300 cannot remotely erase the store computer.
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
 prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.
