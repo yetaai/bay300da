@@ -139,8 +139,22 @@ bay300da run
 bay300da version
 ```
 
-`bay300da version` prints the installed agent release, such as `bay300da 0.4.2`, and does
+`bay300da version` prints the installed agent release, such as `bay300da 0.4.3`, and does
 not require store authorization.
+
+Remove an installation created by the Bay300 installer:
+
+```bash
+bay300da uninstall
+```
+
+The command confirms the managed installation directory before removing the program and its
+`~/.local/bin/bay300da` launcher. Use `bay300da uninstall --yes` for a non-interactive removal.
+It deliberately preserves `~/.bay300/authorization`, `devices.json`, and rendered work so an
+uninstall cannot silently destroy store configuration or output. If the computer is being retired,
+revoke its Devices Admin authorization from Bay300 Device Monitor first. A manually installed,
+pipx-managed, or development copy refuses managed uninstall and must be removed with its own package
+manager.
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
 prompt. Supported types are `bill_printer`, `check_printer`, `printer`, `scanner`, and `other`.

@@ -13,6 +13,7 @@ from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
 from bay300_device_agent.gui_requirements import tkinter_installation_help
+from bay300_device_agent.uninstall import managed_install_root,uninstall_managed
 
 
 class FakeResponse:
@@ -99,11 +100,33 @@ class DeviceAuthorizationTests(unittest.TestCase):
 
     def test_version_subcommand_is_stable_and_needs_no_authorization(self):
         output=StringIO()
-        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.2"),\
+        with patch("bay300_device_agent.cli.importlib.metadata.version",return_value="0.4.3"),\
              patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
             dispatch(build_parser().parse_args(["version"]))
-        self.assertEqual("bay300da 0.4.2\n",output.getvalue())
+        self.assertEqual("bay300da 0.4.3\n",output.getvalue())
         load.assert_not_called()
+
+    def test_uninstall_removes_only_managed_program_and_preserves_local_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory)/"home";root=Path(directory)/"managed";venv=root/"venv"
+            executable=venv/"bin/bay300da";executable.parent.mkdir(parents=True)
+            executable.write_text("launcher");(root/".bay300da-managed-install").touch()
+            launcher=home/".local/bin/bay300da";launcher.parent.mkdir(parents=True)
+            launcher.symlink_to(executable)
+            authorization=home/".bay300/authorization";authorization.parent.mkdir(parents=True)
+            authorization.write_text("preserved")
+            output=StringIO()
+            with redirect_stdout(output):
+                uninstall_managed(True,prefix=venv,home=home,system="Linux")
+            self.assertFalse(root.exists());self.assertFalse(launcher.exists())
+            self.assertEqual("preserved",authorization.read_text())
+            self.assertIn("revoke its authorization",output.getvalue())
+
+    def test_uninstall_rejects_an_unmanaged_virtual_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prefix=Path(directory)/"project/.venv";prefix.mkdir(parents=True)
+            with self.assertRaisesRegex(RuntimeError,"not in a managed installation"):
+                managed_install_root(prefix,Path(directory)/"home","Linux")
 
     def test_shell_ctrl_c_interrupts_run_and_returns_to_prompt(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{

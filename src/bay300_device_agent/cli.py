@@ -48,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     auth.add_argument("--name");auth.add_argument("--printer",help="Add an initial Bill printer")
     sub.add_parser("gui",help="Open the Devices Admin GUI app")
     sub.add_parser("version",help="Show the installed bay300da version")
+    uninstall=sub.add_parser("uninstall",help="Remove the managed bay300da program")
+    uninstall.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
     sub.add_parser("run",help="Run continuous command-line polling")
     sub.add_parser("once",help="Synchronize devices and handle at most one task")
     sub.add_parser("poll",help="Synchronize devices and handle at most one task now")
@@ -116,6 +118,11 @@ def manage_device(args,authorization: dict) -> None:
 def dispatch(args) -> None:
     if args.command=="version":
         print(f"bay300da {importlib.metadata.version('bay300-device-agent')}");return
+    if args.command=="uninstall":
+        from .uninstall import uninstall_managed
+        try:uninstall_managed(args.yes)
+        except RuntimeError as error:raise SystemExit(str(error)) from error
+        return
     if args.command=="authorize":authorize(args);return
     if args.command=="gui":require_tkinter()
     try:authorization=load_authorization()

@@ -10,6 +10,8 @@ python3 -c 'import sys; assert sys.version_info >= (3,11)' || {
 }
 install_root="$HOME/Library/Application Support/Bay300/DevicesAdmin"
 bin_dir="$HOME/.local/bin"
+mkdir -p "$install_root"
+: > "$install_root/.bay300da-managed-install"
 python3 -m venv "$install_root/venv"
 "$install_root/venv/bin/python" -m pip install --upgrade "$(dirname "$0")/agent"
 mkdir -p "$bin_dir"

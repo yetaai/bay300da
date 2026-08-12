@@ -10,6 +10,7 @@ py -3 -c "import sys; assert sys.version_info >= (3,11)" >nul 2>nul || (
   exit /b 1
 )
 if not exist "%INSTALL_ROOT%" mkdir "%INSTALL_ROOT%"
+type nul > "%INSTALL_ROOT%\.bay300da-managed-install"
 py -3 -m venv "%INSTALL_ROOT%\venv" || exit /b 1
 "%INSTALL_ROOT%\venv\Scripts\python.exe" -m pip install --upgrade "%~dp0agent" || exit /b 1
 echo Bay300 Devices Admin installed.

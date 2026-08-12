@@ -28,6 +28,7 @@ venv="$install_root/venv"
 launcher="$bin_dir/bay300da"
 
 mkdir -p "$install_root" "$bin_dir"
+: > "$install_root/.bay300da-managed-install"
 if ! "$python_command" -m venv "$venv"; then
   echo 'Could not create the Python environment.' >&2
   echo 'On Debian/Ubuntu run: sudo apt install python3-venv' >&2
