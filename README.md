@@ -129,6 +129,26 @@ Within the shell, use `help`, `help device`, or `help device add`. `Ctrl+C` inte
 command and returns to the prompt. The arrow keys move the cursor and browse command history.
 `exit`, `quit`, or `Ctrl+D` closes the shell.
 
+To keep task processing active and still administer bay300da, use two operating-system terminals:
+
+```text
+# Terminal 1: the one continuous worker
+$ bay300da run
+
+# Terminal 2: an administration shell
+$ bay300da
+bay300da> device list
+bay300da> device check front
+```
+
+The worker reloads `~/.bay300/devices.json` on every polling cycle. Device changes made in the
+second terminal synchronize immediately and are used by the worker on its next cycle, normally
+within 60 seconds. Keep exactly one worker: while `bay300da run` is active, do not also start the
+GUI, another `run`, `once`, or `poll` process. Read-only commands may run independently, but finish
+one add, edit, remove, block, unblock, or check command before beginning another so separate
+processes do not write the local registry concurrently. `Ctrl+C` in Terminal 1 stops only that
+worker.
+
 The same operations remain available as one-line commands:
 
 ```bash
