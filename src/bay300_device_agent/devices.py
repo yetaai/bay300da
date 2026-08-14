@@ -29,7 +29,7 @@ CARD_READER_PROCESSORS={
     value:full_name for value,full_name in CARD_READER_PROCESSOR_CATALOG.values()
 }
 CARD_READER_INTEGRATION_MESSAGE=(
-    "Please open a support ticket to do integration."
+    "Card reader integration is available through Bay300 Support."
 )
 
 

@@ -142,7 +142,7 @@ class DeviceAuthorizationTests(unittest.TestCase):
             self.assertEqual("Helcim Smart Terminal",row["processorName"])
             self.assertEqual("integration_required",row["status"])
             self.assertEqual([],row["capabilities"])
-            self.assertIn("Please open a support ticket to do integration",output.getvalue())
+            self.assertIn("Card reader integration is available through Bay300 Support",output.getvalue())
             self.assertNotIn("configuration",DeviceRegistry().server_rows()[0])
             sync.assert_called_once()
 

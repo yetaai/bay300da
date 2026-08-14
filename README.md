@@ -182,10 +182,9 @@ A Card reader/payment terminal is a first-class inventory type, not a document s
 one through the common device command with `--type cardReader`. Processor choices are `helcm`,
 `squar`, `paypl`, and `other`; `other` also requires `--processor-name`. Run `bay300da type` to see
 each short name and full name. Registration reports the non-secret processor identity to Device
-Monitor and displays **Please open a support ticket to do integration.** The reader has no payment
-capability. Open Support tickets from Ask Bay300, choose Integration Support, and work with Bay300
-to review the processor/vendor contract and arrange customer-assisted terminal testing. Registering
-a Card reader never claims that an adapter works.
+Monitor and displays **Card reader integration is available through Bay300 Support.** Open Support
+tickets from Ask Bay300, choose Integration Support, and work with Bay300 Support on processor
+setup, validation, and activation. Registration does not itself activate payment processing.
 
 Processor credentials and complete local integration configuration must remain under store control
 and are not part of the device mirror. bay300da must not read or return magnetic-stripe, chip,
