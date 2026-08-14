@@ -105,6 +105,12 @@ It supports Add new device, Remove device, Edit/Config device, Block/Unblock, Ch
 and Poll server now. Polling uses exponential idle backoff from 2 to 60 seconds; Poll server now,
 local configuration changes, task activity, and connectivity recovery reset the cycle.
 
+Continuous polling must remain active whenever Bay300 should use a printer. Each successful poll
+refreshes the agent/device check-in. If Bay300 receives no check-in for three minutes, Device
+Monitor shows the agent Offline and removes its printers from new task choices even when their last
+local status was Ready. Assigned queued work is retained as Waiting for device and resumes on the
+same printer after the GUI background poll or `bay300da run` reconnects.
+
 Use the CLI app when that better fits the store computer:
 
 Start the interactive shell by omitting a subcommand:
