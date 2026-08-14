@@ -5,7 +5,8 @@ import tkinter as tk
 from tkinter import messagebox,simpledialog,ttk
 
 from .agent import DeviceAgent
-from .devices import CAPABILITIES,DeviceRegistry
+from .devices import (CARD_READER_INTEGRATION_MESSAGE,CARD_READER_PROCESSOR_CATALOG,
+                      DEVICE_TYPE_CATALOG,DeviceRegistry)
 from .local_devices import normalize_local_configuration
 
 
@@ -15,8 +16,9 @@ class DevicesAdmin:
         self.agent=DeviceAgent(authorization,self.registry)
         self.root=tk.Tk();self.root.title(f"{authorization['storeName']} Devices Admin")
         self.status=tk.StringVar(value="Starting…")
-        self.tree=ttk.Treeview(self.root,columns=("name","type","status","message"),show="headings")
-        for key,label,width in (("name","Name",180),("type","Type",130),("status","Status",90),("message","Status detail",300)):
+        self.tree=ttk.Treeview(self.root,columns=("name","type","processor","status","message"),show="headings")
+        for key,label,width in (("name","Name",180),("type","Type",130),
+            ("processor","Processor",170),("status","Status",280),("message","Status detail",300)):
             self.tree.heading(key,text=label);self.tree.column(key,width=width)
         self.tree.pack(fill="both",expand=True,padx=12,pady=12)
         bar=ttk.Frame(self.root);bar.pack(fill="x",padx=12)
@@ -35,23 +37,57 @@ class DevicesAdmin:
     def refresh(self):
         selected=self.selected();self.tree.delete(*self.tree.get_children())
         for row in self.registry.list():
-            self.tree.insert("", "end",iid=row["id"],values=(row["name"],row["type"],row["status"],row.get("statusMessage","")))
+            status=(CARD_READER_INTEGRATION_MESSAGE if row["type"]=="card_reader"
+                    and row["status"]=="integration_required" else row["status"])
+            self.tree.insert("", "end",iid=row["id"],values=(row["name"],row["type"],
+                row.get("processorName",""),status,row.get("statusMessage","")))
         if selected and self.tree.exists(selected):self.tree.selection_set(selected)
 
     def ask_type(self,current="bill_printer"):
-        value=simpledialog.askstring("Device type",f"Type: {', '.join(CAPABILITIES)}",initialvalue=current,parent=self.root)
-        if value not in CAPABILITIES:messagebox.showerror("Invalid type","Choose a listed device type.");return None
-        return value
+        current_name=next((name for name,(value,_) in DEVICE_TYPE_CATALOG.items()
+                           if value==current),"printer")
+        value=simpledialog.askstring("Device type",
+            f"Type: {', '.join(DEVICE_TYPE_CATALOG)}",initialvalue=current_name,
+            parent=self.root)
+        if value not in DEVICE_TYPE_CATALOG:
+            messagebox.showerror("Invalid type","Choose a listed device type.");return None
+        return DEVICE_TYPE_CATALOG[value][0]
+
+    def ask_processor(self,current="helcim_smart_terminal",current_name=""):
+        current_short=next((name for name,(value,_) in CARD_READER_PROCESSOR_CATALOG.items()
+                            if value==current),"helcm")
+        value=simpledialog.askstring("Card reader processor",
+            f"Processor: {', '.join(CARD_READER_PROCESSOR_CATALOG)}",
+            initialvalue=current_short,
+            parent=self.root)
+        if value not in CARD_READER_PROCESSOR_CATALOG:
+            messagebox.showerror("Invalid processor","Choose a listed Card reader processor.")
+            return None
+        name=""
+        if value=="other":
+            name=simpledialog.askstring("Processor name","Processor name",
+                initialvalue=current_name,parent=self.root) or ""
+            if not name.strip():
+                messagebox.showerror("Processor name","Enter the Card reader processor name.")
+                return None
+        return CARD_READER_PROCESSOR_CATALOG[value][0],name
 
     def add(self):
         name=simpledialog.askstring("Add device","Device name",parent=self.root)
         if not name:return
         device_type=self.ask_type()
         if not device_type:return
-        config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",parent=self.root) or ""
+        processor=("","")
+        if device_type=="card_reader":
+            processor=self.ask_processor()
+            if not processor:return
+            config=""
+        else:
+            config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",parent=self.root) or ""
         try:
-            configuration=normalize_local_configuration(config or name,device_type)
-            self.registry.add(name,device_type,configuration);self.changed()
+            selector="" if device_type=="card_reader" else config or name
+            configuration=normalize_local_configuration(selector,device_type)
+            self.registry.add(name,device_type,configuration,*processor);self.changed()
         except ValueError as error:messagebox.showerror("Local device selection",str(error))
 
     def remove(self):
@@ -68,10 +104,18 @@ class DevicesAdmin:
         if not name:return
         device_type=self.ask_type(row["type"])
         if not device_type:return
-        config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",initialvalue=row.get("configuration",""),parent=self.root)
+        processor=("","")
+        if device_type=="card_reader":
+            processor=self.ask_processor(row.get("processor","helcim_smart_terminal"),
+                                         row.get("processorName",""))
+            if not processor:return
+            config=""
+        else:
+            config=simpledialog.askstring("Local configuration","Printer name, scanner identifier, or local configuration",initialvalue=row.get("configuration",""),parent=self.root)
         try:
             configuration=normalize_local_configuration(config or "",device_type)
-            self.registry.update(item,name=name,type=device_type,configuration=configuration);self.changed()
+            self.registry.update(item,name=name,type=device_type,configuration=configuration,
+                                 processor=processor[0],processorName=processor[1]);self.changed()
         except ValueError as error:messagebox.showerror("Local device selection",str(error))
 
     def block(self):

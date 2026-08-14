@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from bay300_device_agent.agent import DeviceAgent
 from bay300_device_agent.cli import (build_parser,dispatch,enable_shell_line_editing,
-                                     interactive_shell,main,manage_device)
+                                     interactive_shell,main,manage_device,show_types)
 from bay300_device_agent.client import Bay300Client
 from bay300_device_agent.config import load_authorization,save_authorization
 from bay300_device_agent.devices import DeviceRegistry
@@ -72,14 +72,14 @@ class DeviceAuthorizationTests(unittest.TestCase):
             parser=build_parser();authorization={"server":"https://bay300.test","token":"secret"}
             output=StringIO()
             with redirect_stdout(output):
-                manage_device(parser.parse_args(["device","add","--name","Front","--type","bill_printer",
+                manage_device(parser.parse_args(["device","add","--name","Front","--type","printer",
                     "--configuration","Front-CUPS"]),authorization)
             registry=DeviceRegistry();device_id=registry.list()[0]["id"]
             manage_device(parser.parse_args(["device","edit",device_id,"--name","Reception"]),authorization)
             manage_device(parser.parse_args(["device","block","rec"]),authorization)
             self.assertEqual("blocked",registry.list()[0]["status"])
             manage_device(parser.parse_args(["device","unblock","RECEP"]),authorization)
-            manage_device(parser.parse_args(["device","edit","reception","--type","other"]),authorization)
+            manage_device(parser.parse_args(["device","edit","reception","--type","scanner"]),authorization)
             manage_device(parser.parse_args(["device","check","re"]),authorization)
             listing=StringIO()
             with redirect_stdout(listing):
@@ -96,10 +96,10 @@ class DeviceAuthorizationTests(unittest.TestCase):
         ]),patch("bay300_device_agent.cli.DeviceAgent.sync"):
             parser=build_parser();authorization={"server":"https://bay300.test","token":"secret"}
             manage_device(parser.parse_args([
-                "device","add","--name","pdf","--type","bill_printer",
+                "device","add","--name","pdf","--type","printer",
             ]),authorization)
             manage_device(parser.parse_args([
-                "device","add","--name","PDF test","--type","bill_printer","--configuration","PdF",
+                "device","add","--name","PDF test","--type","printer","--configuration","PdF",
             ]),authorization)
             self.assertEqual(["PDFwriter","PDFwriter"],[
                 row["configuration"] for row in DeviceRegistry().list()
@@ -124,6 +124,58 @@ class DeviceAuthorizationTests(unittest.TestCase):
             with self.assertRaises(ValueError):registry.add("Front","unsupported")
             with self.assertRaises(KeyError):registry.remove("missing")
             self.assertEqual([],registry.add("Future scanner","scanner")["capabilities"])
+
+    def test_device_add_records_card_reader_processor_without_payment_capability(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }),patch("bay300_device_agent.cli.DeviceAgent.sync") as sync:
+            parser=build_parser();authorization={"server":"https://bay300.test","token":"secret"}
+            output=StringIO()
+            with redirect_stdout(output):
+                manage_device(parser.parse_args([
+                    "device","add","--name","Front counter","--type","cardReader",
+                    "--processor","helcm",
+                ]),authorization)
+            row=DeviceRegistry().list()[0]
+            self.assertEqual("card_reader",row["type"])
+            self.assertEqual("helcim_smart_terminal",row["processor"])
+            self.assertEqual("Helcim Smart Terminal",row["processorName"])
+            self.assertEqual("integration_required",row["status"])
+            self.assertEqual([],row["capabilities"])
+            self.assertIn("Please open a support ticket to do integration",output.getvalue())
+            self.assertNotIn("configuration",DeviceRegistry().server_rows()[0])
+            sync.assert_called_once()
+
+    def test_type_query_shows_short_names_and_needs_no_authorization(self):
+        parser=build_parser();output=StringIO()
+        with patch("bay300_device_agent.cli.load_authorization") as load,redirect_stdout(output):
+            dispatch(parser.parse_args(["type"]))
+        load.assert_not_called()
+        self.assertIn("cardReader  Card reader",output.getvalue())
+        for short,full_name in (("helcm","Helcim Smart Terminal"),
+                                ("squar","Square Terminal"),
+                                ("paypl","PayPal Point of Sale")):
+            self.assertLessEqual(len(short),5)
+            self.assertIn(f"{short}  {full_name}",output.getvalue())
+
+    def test_card_reader_requires_known_or_named_other_processor(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{
+            "BAY300DA_DEVICES":f"{directory}/devices.json",
+        }):
+            registry=DeviceRegistry()
+            with self.assertRaisesRegex(ValueError,"Choose a supported"):
+                registry.add("Counter","card_reader")
+            with self.assertRaisesRegex(ValueError,"only used with type cardReader"):
+                registry.add("Front","bill_printer",processor="helcim_smart_terminal")
+            with self.assertRaisesRegex(ValueError,"Processor name is required"):
+                registry.add("Counter","card_reader",processor="other")
+            custom=registry.add("Counter","card_reader",processor="other",
+                                processor_name="Regional Processor")
+            self.assertEqual("Regional Processor",custom["processorName"])
+            self.assertEqual("integration_required",registry.check(custom["id"])["status"])
+            registry.block(custom["id"])
+            self.assertEqual("blocked",registry.update(custom["id"],name="Counter 2")["status"])
+            self.assertEqual("integration_required",registry.block(custom["id"],False)["status"])
 
     def test_registry_resolves_unique_case_insensitive_name_prefix(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{

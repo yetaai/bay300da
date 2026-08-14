@@ -12,8 +12,43 @@ from .config import load_devices,save_devices
 
 CAPABILITIES={
     "bill_printer":["bill_print"],"check_printer":[],
-    "printer":[],"scanner":[],"other":[],
+    "printer":[],"scanner":[],"card_reader":[],"other":[],
 }
+DEVICE_TYPE_CATALOG={
+    "printer":("bill_printer","Printer"),
+    "scanner":("scanner","Document scanner"),
+    "cardReader":("card_reader","Card reader"),
+}
+CARD_READER_PROCESSOR_CATALOG={
+    "helcm":("helcim_smart_terminal","Helcim Smart Terminal"),
+    "squar":("square_terminal","Square Terminal"),
+    "paypl":("paypal_point_of_sale","PayPal Point of Sale"),
+    "other":("other","Other processor"),
+}
+CARD_READER_PROCESSORS={
+    value:full_name for value,full_name in CARD_READER_PROCESSOR_CATALOG.values()
+}
+CARD_READER_INTEGRATION_MESSAGE=(
+    "Please open a support ticket to do integration."
+)
+
+
+def processor_details(device_type: str,processor: str="",
+                      processor_name: str="") -> tuple[str,str]:
+    if device_type!="card_reader":
+        if processor.strip() or processor_name.strip():
+            raise ValueError("Processor is only used with type cardReader")
+        return "",""
+    code=processor.strip()
+    if code not in CARD_READER_PROCESSORS:
+        raise ValueError("Choose a supported Card reader processor")
+    custom=processor_name.strip()
+    if code=="other":
+        if not custom:raise ValueError("Processor name is required when processor is other")
+        if len(custom)>200:raise ValueError("Processor name must be 200 characters or fewer")
+        return code,custom
+    if custom:raise ValueError("Processor name is only used when processor is other")
+    return code,CARD_READER_PROCESSORS[code]
 
 
 class DeviceRegistry:
@@ -26,15 +61,24 @@ class DeviceRegistry:
     def save(self,devices: list[dict]) -> None:
         with self.lock:save_devices(devices)
 
-    def add(self,name: str,device_type: str,configuration: str="") -> dict:
+    def add(self,name: str,device_type: str,configuration: str="",processor: str="",
+            processor_name: str="") -> dict:
         with self.lock:
             clean_name=name.strip()
             if not clean_name:raise ValueError("Device name is required")
             if device_type not in CAPABILITIES:raise ValueError(f"Unsupported device type: {device_type}")
+            processor_code,display_processor=processor_details(
+                device_type,processor,processor_name
+            )
             devices=self.list()
             row={"id":uuid.uuid4().hex,"name":clean_name,"type":device_type,
                  "capabilities":CAPABILITIES[device_type],"status":"ready",
                  "configuration":configuration.strip(),"statusMessage":"Not checked yet"}
+            if device_type=="card_reader":row.update({
+                "processor":processor_code,"processorName":display_processor,
+                "status":"integration_required",
+                "statusMessage":CARD_READER_INTEGRATION_MESSAGE,
+            })
             devices.append(row);self.save(devices);return row
 
     def resolve(self,selector: str) -> dict:
@@ -61,8 +105,27 @@ class DeviceRegistry:
             devices=self.list();match=None
             for row in devices:
                 if row["id"]==device_id:
+                    next_type=changes.get("type",row.get("type"))
+                    next_processor=changes.get("processor",row.get("processor",""))
+                    next_processor_name=(changes.get("processorName","")
+                        if "processor" in changes else changes.get(
+                            "processorName",row.get("processorName","")
+                        ))
+                    processor_code,display_processor=processor_details(
+                        next_type,next_processor,next_processor_name
+                    )
                     row.update({key:value for key,value in changes.items() if value is not None})
-                    if "type" in changes:row["capabilities"]=CAPABILITIES[changes["type"]]
+                    row["capabilities"]=CAPABILITIES[next_type]
+                    if next_type=="card_reader":
+                        blocked=changes.get("status",row.get("status"))=="blocked"
+                        row.update({
+                            "processor":processor_code,"processorName":display_processor,
+                            "status":"blocked" if blocked else "integration_required",
+                            "statusMessage":"Blocked locally" if blocked
+                                else CARD_READER_INTEGRATION_MESSAGE,
+                        })
+                    else:
+                        row.pop("processor",None);row.pop("processorName",None)
                     match=row
             if not match:raise KeyError(device_id)
             self.save(devices);return match
@@ -74,6 +137,11 @@ class DeviceRegistry:
             self.save(devices)
 
     def block(self,device_id: str,blocked: bool=True) -> dict:
+        row=next((item for item in self.list() if item["id"]==device_id),None)
+        if not row:raise KeyError(device_id)
+        if row["type"]=="card_reader" and not blocked:
+            return self.update(device_id,status="integration_required",
+                               statusMessage=CARD_READER_INTEGRATION_MESSAGE)
         return self.update(device_id,status="blocked" if blocked else "ready",
                            statusMessage="Blocked locally" if blocked else "Ready")
 
@@ -81,6 +149,9 @@ class DeviceRegistry:
         row=next((item for item in self.list() if item["id"]==device_id),None)
         if not row:raise KeyError(device_id)
         if row["status"]=="blocked":return row
+        if row["type"]=="card_reader":
+            return self.update(device_id,status="integration_required",
+                               statusMessage=CARD_READER_INTEGRATION_MESSAGE)
         configuration=row.get("configuration","")
         try:
             if row["type"] in {"bill_printer","check_printer","printer"}:
@@ -100,5 +171,6 @@ class DeviceRegistry:
 
     def server_rows(self) -> list[dict]:
         return [{key:row.get(key) for key in
-                 ("id","name","type","capabilities","status","statusMessage")}
+                 ("id","name","type","processor","processorName","capabilities",
+                  "status","statusMessage")}
                 for row in self.list()]

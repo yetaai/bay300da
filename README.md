@@ -127,7 +127,9 @@ The same operations remain available as one-line commands:
 
 ```bash
 bay300da device list
-bay300da device add --name "Front counter" --type bill_printer --configuration "Front-CUPS"
+bay300da type
+bay300da device add --name "Front counter" --type printer --configuration "Front-CUPS"
+bay300da device add --name "Front card reader" --type cardReader --processor helcm
 bay300da device edit DEVICE_ID --name "Reception printer"
 bay300da device block DEVICE_ID
 bay300da device unblock DEVICE_ID
@@ -140,6 +142,10 @@ bay300da run
 bay300da version
 bay300da local
 ```
+
+`bay300da type` lists the short device-type and processor names accepted by `device add`, together
+with their full names. Processor names are at most five characters: `helcm`, `squar`, `paypl`, and
+`other`. The command is read-only and does not require store authorization.
 
 Commands that identify a configured local device accept its full ID or a unique,
 case-insensitive leading part of its name. For example, `bay300da device check front` selects
@@ -165,19 +171,27 @@ On Linux and macOS, this reads CUPS through `lpstat` and document scanners expos
 `scanimage -L`. On Windows, it reads installed printers and present Image/Camera-class devices from
 PowerShell. Discovery is best-effort and read-only: it does not install drivers, prove that a device
 works, authorize the agent, or create a Bay300 device. Use the discovered CUPS/Windows printer name
-as the `--configuration` value when adding a `bill_printer`, then run `bay300da device check`.
+as the `--configuration` value when adding a `printer`, then run `bay300da device check`.
 
 **Only `bill_printer` task processing is implemented today.** `check_printer`, generic `printer`,
 `scanner`, and `other` remain reserved device types and metadata foundations; scanner discovery does
-not mean Bay300 can ingest a scan. The command intentionally does not discover or classify credit-
-card readers as scanners.
+not mean Bay300 can ingest a scan. The command intentionally does not discover a Card reader through
+printer/scanner discovery.
 
-A credit-card reader/payment terminal captures payment-account data and is not a document scanner.
-Bay300's current service-payment boundary keeps card processing wholly in the store's external
-terminal and records only the outcome and receiving account. bay300da must not read magnetic-stripe,
-chip, contactless, PIN, PAN, or other cardholder data. Future terminal integration would require a
-specific processor/vendor SDK, tokenized result contract, supported-device policy, PCI assessment,
-tamper/inventory controls, and a separate capability—not the generic `scanner` type.
+A Card reader/payment terminal is a first-class inventory type, not a document scanner. Register
+one through the common device command with `--type cardReader`. Processor choices are `helcm`,
+`squar`, `paypl`, and `other`; `other` also requires `--processor-name`. Run `bay300da type` to see
+each short name and full name. Registration reports the non-secret processor identity to Device
+Monitor and displays **Please open a support ticket to do integration.** The reader has no payment
+capability. Open Support tickets from Ask Bay300, choose Integration Support, and work with Bay300
+to review the processor/vendor contract and arrange customer-assisted terminal testing. Registering
+a Card reader never claims that an adapter works.
+
+Processor credentials and complete local integration configuration must remain under store control
+and are not part of the device mirror. bay300da must not read or return magnetic-stripe, chip,
+contactless, PIN, PAN, CVV, or other cardholder data. Enabling payment tasks later requires a tested
+processor adapter, tokenized non-card-data result contract, supported-device policy, PCI/security
+review, tamper/inventory controls, and a separate `card_payment` capability.
 
 Remove an installation created by the Bay300 installer:
 
@@ -221,8 +235,8 @@ when a computer is lost, transferred, or suspected compromised; otherwise the cr
 working at its displayed 30-day expiration. Bay300 cannot remotely erase the store computer.
 
 Use `bay300da device list --json` for scripts. Add `--yes` to `device remove` to skip its safety
-prompt. Recognized registry types are `bill_printer`, `check_printer`, `printer`, `scanner`, and
-`other`, but only `bill_printer` has an executable task handler today.
+prompt. Recognized registry types are `bill_printer`, `check_printer`, `printer`, `scanner`,
+`card_reader`, and `other`, but only `bill_printer` has an executable task handler today.
 The GUI is available explicitly as `bay300da gui`.
 
 Linux users may install `packaging/bay300-device-agent.service` as a systemd user service.

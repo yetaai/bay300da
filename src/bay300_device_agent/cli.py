@@ -13,7 +13,8 @@ import time
 from .agent import DeviceAgent
 from .client import Bay300Client
 from .config import authorization_path,load_authorization,save_authorization
-from .devices import CAPABILITIES,DeviceRegistry
+from .devices import (CARD_READER_INTEGRATION_MESSAGE,CARD_READER_PROCESSOR_CATALOG,CAPABILITIES,
+                      DEVICE_TYPE_CATALOG,DeviceRegistry)
 from .gui_requirements import require_tkinter
 from .local_devices import normalize_local_configuration
 
@@ -51,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     auth.add_argument("--name");auth.add_argument("--printer",help="Add an initial Bill printer")
     sub.add_parser("gui",help="Open the Devices Admin GUI app")
     sub.add_parser("version",help="Show the installed bay300da version")
+    type_query=sub.add_parser("type",help="List device types and Card reader processors")
+    type_query.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     uninstall=sub.add_parser("uninstall",help="Remove the managed bay300da program")
     uninstall.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
     local=sub.add_parser("local",help="List locally discovered printers and document scanners")
@@ -64,13 +67,19 @@ def build_parser() -> argparse.ArgumentParser:
     listing=actions.add_parser("list",help="List configured local devices")
     listing.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     add=actions.add_parser("add",help="Add a local device")
-    add.add_argument("--name",required=True);add.add_argument("--type",required=True,choices=tuple(CAPABILITIES))
+    add.add_argument("--name",required=True);add.add_argument("--type",required=True,
+        choices=tuple(DEVICE_TYPE_CATALOG))
     add.add_argument("--configuration",default="",help="Printer name, scanner identifier, or local configuration")
+    add.add_argument("--processor",choices=tuple(CARD_READER_PROCESSOR_CATALOG),
+                     help="Required when --type cardReader")
+    add.add_argument("--processor-name",help="Required only when --processor other")
     add.add_argument("--json",action="store_true",help="Print machine-readable JSON")
     edit=actions.add_parser("edit",help="Edit a local device")
     edit.add_argument("device",help="Full device ID or unique case-insensitive name prefix")
-    edit.add_argument("--name");edit.add_argument("--type",choices=tuple(CAPABILITIES))
+    edit.add_argument("--name");edit.add_argument("--type",choices=tuple(DEVICE_TYPE_CATALOG))
     edit.add_argument("--configuration");edit.add_argument("--json",action="store_true",help="Print machine-readable JSON")
+    edit.add_argument("--processor",choices=tuple(CARD_READER_PROCESSOR_CATALOG))
+    edit.add_argument("--processor-name",help="Required only when --processor other")
     remove=actions.add_parser("remove",help="Remove a local device while retaining server task history")
     remove.add_argument("device",help="Full device ID or unique case-insensitive name prefix")
     remove.add_argument("--yes",action="store_true",help="Skip the confirmation prompt")
@@ -81,10 +90,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def show_types(json_output: bool=False) -> None:
+    rows=[{"kind":"device","name":name,"fullName":full_name}
+          for name,(_,full_name) in DEVICE_TYPE_CATALOG.items()]
+    rows.extend({"kind":"processor","name":name,"fullName":full_name}
+                for name,(_,full_name) in CARD_READER_PROCESSOR_CATALOG.items())
+    if json_output:print(json.dumps(rows,sort_keys=True));return
+    print("KIND  NAME  FULL NAME")
+    for row in rows:print(f"{row['kind']}  {row['name']}  {row['fullName']}")
+
+
 def _print_device(row: dict,json_output: bool=False) -> None:
     if json_output:print(json.dumps(row,sort_keys=True));return
     detail=row.get("statusMessage","")
-    print(f"{row['id']}  {row['name']}  {row['type']}  {row['status']}  {row.get('configuration','')}  {detail}")
+    processor=row.get("processorName","")
+    device_type=next((name for name,(value,_) in DEVICE_TYPE_CATALOG.items()
+                      if value==row["type"]),row["type"])
+    status=(CARD_READER_INTEGRATION_MESSAGE if row["type"]=="card_reader"
+            and row["status"]=="integration_required" else row["status"])
+    print(f"{row['id']}  {row['name']}  {device_type}  {processor}  {status}  "
+          f"{row.get('configuration','')}  {detail}")
 
 
 def manage_device(args,authorization: dict) -> None:
@@ -94,24 +119,35 @@ def manage_device(args,authorization: dict) -> None:
         if args.json:print(json.dumps(rows,sort_keys=True))
         elif not rows:print("No local devices configured.")
         else:
-            print("ID  NAME  TYPE  STATUS  CONFIGURATION  STATUS DETAIL")
+            print("ID  NAME  TYPE  PROCESSOR  STATUS  CONFIGURATION  STATUS DETAIL")
             for row in rows:_print_device(row)
         return
     try:
         if args.device_command=="add":
-            selector=args.configuration or args.name
-            configuration=normalize_local_configuration(selector,args.type)
-            row=registry.add(args.name,args.type,configuration)
+            device_type=DEVICE_TYPE_CATALOG[args.type][0]
+            processor=(CARD_READER_PROCESSOR_CATALOG[args.processor][0]
+                       if args.processor else "")
+            selector="" if device_type=="card_reader" else args.configuration or args.name
+            configuration=normalize_local_configuration(selector,device_type)
+            row=registry.add(args.name,device_type,configuration,processor,
+                             args.processor_name or "")
         else:
             selected=registry.resolve(args.device)
             device_id=selected["id"]
         if args.device_command=="edit":
-            configuration=(normalize_local_configuration(args.configuration,args.type or selected["type"])
+            device_type=(DEVICE_TYPE_CATALOG[args.type][0] if args.type else selected["type"])
+            processor=(CARD_READER_PROCESSOR_CATALOG[args.processor][0]
+                       if args.processor else None)
+            configuration=(normalize_local_configuration(args.configuration,device_type)
                            if args.configuration is not None else None)
             changes={key:value for key,value in {
-                "name":args.name,"type":args.type,"configuration":configuration,
+                "name":args.name,"type":device_type if args.type else None,
+                "configuration":configuration,"processor":processor,
+                "processorName":args.processor_name,
             }.items() if value is not None}
-            if not changes:raise SystemExit("Specify --name, --type, or --configuration to edit.")
+            if not changes:raise SystemExit(
+                "Specify --name, --type, --configuration, or processor fields to edit."
+            )
             row=registry.update(device_id,**changes)
         elif args.device_command=="remove":
             if not args.yes and input(f"Remove local device {selected['name']}? [y/N] ").strip().lower() not in {"y","yes"}:
@@ -133,6 +169,7 @@ def manage_device(args,authorization: dict) -> None:
 def dispatch(args) -> None:
     if args.command=="version":
         print(f"bay300da {importlib.metadata.version('bay300-device-agent')}");return
+    if args.command=="type":show_types(args.json);return
     if args.command=="uninstall":
         from .uninstall import uninstall_managed
         try:uninstall_managed(args.yes)
