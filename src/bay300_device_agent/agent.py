@@ -48,19 +48,20 @@ class DeviceAgent:
 
     def _handle(self,job: dict,device: dict) -> None:
         job_id=job["jobId"]
-        if job.get("jobType")!="bill_print":
+        if job.get("jobType") not in ("bill_print","service_menu_print"):
             self.client.failed(job_id,f"Unsupported device job type: {job.get('jobType')!r}");return
         pending_html=None;pending_pdf=None
         try:
             if self.client.task_state(job_id).get("cancellationRequested"):return
             raw=job["documentJson"];actual=hashlib.sha256(raw.encode()).hexdigest()
-            if actual!=job["documentSha256"]:raise RuntimeError("Bill checksum mismatch; refusing to print")
+            if actual!=job["documentSha256"]:raise RuntimeError("Document checksum mismatch; refusing to print")
             document=json.loads(raw)
-            if document.get("schemaVersion")!="bay300.bill-print.v1":
+            if document.get("schemaVersion") not in ("bay300.bill-print.v1","bay300.service-menu-print.v1"):
                 raise RuntimeError(f"Unsupported schema {document.get('schemaVersion')!r}")
             if self._status(job_id)=="completed":
                 self.client.spooled(job_id,"already-completed-locally");return
-            safe="".join(c if c.isalnum() or c in "-_" else "-" for c in document["billNumber"])
+            identity=document.get("billNumber") or (document.get("store") or {}).get("name") or "service-menu"
+            safe="".join(c if c.isalnum() or c in "-_" else "-" for c in identity)
             filename=f"{safe}-v{job['documentVersion']}-copy{job['copyNumber']}-{job_id}.html"
             pending_html=write_html(document,job["copyNumber"],self.root/"Pending"/filename)
             pending_pdf=write_pdf(document,job["copyNumber"],pending_html.with_suffix(".pdf"))

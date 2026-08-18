@@ -10,7 +10,7 @@ drivers, paths, and other local configuration remain on the store machine.
 - Python 3.11 or newer;
 - an HTTPS connection to `https://bay300.com`;
 - Tk/Tkinter only when using the GUI app;
-- a locally installed printer driver/CUPS queue for current Bill printing.
+- a locally installed printer driver/CUPS queue for Bill and Service Menu printing.
 
 Store Owner/OP users should normally open **Device Monitor → Install Devices Admin**. Bay300
 provides separate Windows, Linux, and macOS bundles and highlights the likely package based on the
@@ -199,7 +199,8 @@ PowerShell. Discovery is best-effort and read-only: it does not install drivers,
 works, authorize the agent, or create a Bay300 device. Use the discovered CUPS/Windows printer name
 as the `--configuration` value when adding a `printer`, then run `bay300da device check`.
 
-**Only `bill_printer` task processing is implemented today.** `check_printer`, generic `printer`,
+**Only `bill_printer` task processing is implemented today.** It handles distinct, checksum-verified
+Bill and Service Menu documents. `check_printer`, generic `printer`,
 `scanner`, and `other` remain reserved device types and metadata foundations; scanner discovery does
 not mean Bay300 can ingest a scan. The command intentionally does not discover a Card reader through
 printer/scanner discovery.
@@ -269,7 +270,7 @@ Windows production packaging should use a signed PyInstaller executable plus Sch
 Windows Service; macOS should use a signed/notarized app plus LaunchAgent. The pip installation is
 the portable Grace-pilot distribution.
 
-Rendered Bill PDF/HTML and the idempotency journal remain under `~/.bay300/work`. Reprints are new
+Rendered Bill or Service Menu PDF/HTML and the idempotency journal remain under `~/.bay300/work`. Reprints are new
 audited server tasks. A processing cancellation is cooperative: the agent checks immediately before
 rendering and immediately before sending output to the local print subsystem.
 

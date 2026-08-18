@@ -10,6 +10,8 @@ def money(value: object) -> str:
 
 
 def render_html(document: dict, copy_number: int) -> str:
+    if document.get("schemaVersion")=="bay300.service-menu-print.v1":
+        return render_service_menu_html(document)
     services = "".join(
         "<tr><td>{}</td><td>{}</td><td class='amount'>{}</td></tr>".format(
             escape(str(item.get("description", "Service"))),
@@ -58,6 +60,26 @@ th,td{{padding:8px;border-bottom:1px solid #bbb;text-align:left}}.amount{{text-a
 </body></html>"""
 
 
+def render_service_menu_html(document: dict) -> str:
+    store=document.get("store") or {}
+    services="".join(
+        "<section><h2>{}</h2><p>{}</p></section>".format(
+            escape(str(service.get("name") or "Service")),
+            " · ".join(f"{point.get('minutes')} minutes — {money(point.get('price'))}"
+                       for point in service.get("menuPoints",[]))
+        ) for service in document.get("services",[])
+    )
+    address=", ".join(str(store.get(key)) for key in ("address","city","stateRegion","postalCode")
+                      if store.get(key))
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Service Menu</title>
+<style>@page{{size:auto;margin:12mm}}body{{font:16px system-ui,sans-serif;max-width:760px;margin:auto;color:#17211c}}
+h1{{font-size:34px;margin-bottom:4px}}h2{{margin-bottom:6px}}section{{border-bottom:1px solid #aaa;padding:8px 0}}
+.meta{{color:#555}}</style></head><body><h1>{escape(str(store.get('name') or 'Service Menu'))}</h1>
+<p class="meta">{escape(address)}{' · '+escape(str(store.get('phone'))) if store.get('phone') else ''}</p>
+{services}<p class="meta">Final price may vary with actual minutes, selected professional, tax, venue, or approved adjustments.</p>
+</body></html>"""
+
+
 def write_html(document: dict, copy_number: int, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(render_html(document, copy_number), encoding="utf-8")
@@ -65,6 +87,8 @@ def write_html(document: dict, copy_number: int, destination: Path) -> Path:
 
 
 def write_pdf(document: dict, copy_number: int, destination: Path) -> Path:
+    if document.get("schemaVersion")=="bay300.service-menu-print.v1":
+        return write_service_menu_pdf(document,destination)
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet
@@ -102,4 +126,24 @@ def write_pdf(document: dict, copy_number: int, destination: Path) -> Path:
         Paragraph("Return this form to store staff. Staff must enter the customer decision in Bay300 before final Receiving.",styles["Normal"])])
     SimpleDocTemplate(str(destination),pagesize=letter,rightMargin=0.55*inch,leftMargin=0.55*inch,
         topMargin=0.5*inch,bottomMargin=0.5*inch,title=f"Bill {document['billNumber']}").build(story)
+    return destination
+
+
+def write_service_menu_pdf(document: dict,destination: Path) -> Path:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph,SimpleDocTemplate,Spacer
+    destination.parent.mkdir(parents=True,exist_ok=True);styles=getSampleStyleSheet()
+    store=document.get("store") or {}
+    story=[Paragraph(escape(str(store.get("name") or "Service Menu")),styles["Title"]),
+           Paragraph("Service Menu",styles["Heading2"]),Spacer(1,10)]
+    for service in document.get("services",[]):
+        story.append(Paragraph(escape(str(service.get("name") or "Service")),styles["Heading2"]))
+        points=" · ".join(f"{point.get('minutes')} minutes — {money(point.get('price'))}"
+                          for point in service.get("menuPoints",[]))
+        story.extend([Paragraph(escape(points),styles["Normal"]),Spacer(1,10)])
+    story.append(Paragraph("Final price may vary with actual minutes, selected professional, tax, venue, or approved adjustments.",styles["Italic"]))
+    SimpleDocTemplate(str(destination),pagesize=letter,rightMargin=.55*inch,leftMargin=.55*inch,
+        topMargin=.5*inch,bottomMargin=.5*inch,title="Service Menu").build(story)
     return destination
